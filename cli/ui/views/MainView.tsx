@@ -3,9 +3,8 @@ import { Box, Text, useApp } from 'ink';
 import SelectInput from 'ink-select-input';
 import { MeterBar } from '../components/MeterBar.js';
 import { useTUIStore } from '../store.js';
-import { AudioBridge } from '../../engine/audio-bridge.js';
-
-export const MainView = ({ bridge }: { bridge: AudioBridge }) => {
+import { SonicEngine } from '@sonic-core/index.js';
+export const MainView = ({ bridge }: { bridge: SonicEngine }) => {
   const { exit } = useApp();
   const { playback, metering, message, setView } = useTUIStore();
 

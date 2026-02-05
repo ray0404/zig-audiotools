@@ -6,11 +6,12 @@ export interface CanvasDrawCallback {
 
 interface ResponsiveCanvasPropsV2 {
     onMount: (canvas: HTMLCanvasElement) => void;
+    onResize?: (canvas: HTMLCanvasElement) => void;
     className?: string;
     label?: string;
 }
 
-export const ResponsiveCanvas: React.FC<ResponsiveCanvasPropsV2> = ({ onMount, className, label }) => {
+export const ResponsiveCanvas: React.FC<ResponsiveCanvasPropsV2> = ({ onMount, onResize, className, label }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -29,12 +30,15 @@ export const ResponsiveCanvas: React.FC<ResponsiveCanvasPropsV2> = ({ onMount, c
                 const dpr = window.devicePixelRatio || 1;
                 
                 // Only update if changed to avoid flicker/loops
-                if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-                    canvas.width = width * dpr;
-                    canvas.height = height * dpr;
+                if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
+                    canvas.width = Math.floor(width * dpr);
+                    canvas.height = Math.floor(height * dpr);
                     // Reset transform
                     const ctx = canvas.getContext('2d');
                     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    
+                    // Trigger resize callback
+                    if (onResize) onResize(canvas);
                 }
             }
         });

@@ -3,7 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import { useTUIStore } from '../store.js';
-import { AudioBridge } from '../../engine/audio-bridge.js';
+import { SonicEngine } from '@sonic-core/index.js';
 import path from 'path';
 
 const InputListener = ({ onEsc }: { onEsc: () => void }) => {
@@ -13,7 +13,7 @@ const InputListener = ({ onEsc }: { onEsc: () => void }) => {
   return null;
 };
 
-export const ExportView = ({ bridge }: { bridge: AudioBridge }) => {
+export const ExportView = ({ bridge }: { bridge: SonicEngine }) => {
   const { isExporting, setIsExporting, message, setMessage, setView } = useTUIStore();
   const [exportPath, setExportPath] = React.useState('output.wav');
 

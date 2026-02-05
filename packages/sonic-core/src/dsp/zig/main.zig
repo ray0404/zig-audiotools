@@ -336,9 +336,8 @@ fn calc_hpf_coeffs(fc: f32, sample_rate: f32) Biquad {
 // We will assume the buffer passed is Interleaved Stereo.
 // If it's mono, this effect does nothing useful (LPF + HPF = Original).
 
-export fn process_mono_bass(ptr: [*]f32, len: usize, freq: f32) void {
+export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32) void {
     const data = ptr[0..len];
-    const sample_rate = 44100.0; // Assumption or should be passed?
     
     // 2 cascaded Butterworths = Linkwitz-Riley 4th order
     var lpf_l1 = calc_lpf_coeffs(freq, sample_rate);

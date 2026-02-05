@@ -8,3 +8,5 @@ export * from './core/track-strip';
 export * from './core/bus-strip';
 export * from './core/context-manager';
 export * from './core/node-factory';
+export * from './engine-interface';
+export * from './sdk';

@@ -1,9 +1,9 @@
 import React from 'react';
 import { render } from 'ink';
 import { TerminalApp } from './TerminalApp.js';
-import { AudioBridge } from '../engine/audio-bridge.js';
+import { SonicEngine } from '@sonic-core/index.js';
 
-export const runTUI = async (bridge: AudioBridge) => {
+export const runTUI = async (bridge: SonicEngine) => {
   const { waitUntilExit } = render(<TerminalApp bridge={bridge} />);
   await waitUntilExit();
 };

@@ -1,123 +1,50 @@
-# Sonic Forge - Agent Operational Guide
+# SonicPress - Agent Instructions & Context
 
-This document provides a comprehensive overview of the Sonic Forge codebase, architecture, and operational procedures for AI agents and developers.
+Welcome, Agent. This document provides the critical context needed to understand, maintain, and expand the **SonicPress** codebase.
 
-## 1. Project Identity & Purpose
+## 1. Project Identity
+*   **Name:** SonicPress (formerly SonicForge).
+*   **Mission:** Provide specialized, high-performance audio DSP tools for the web and CLI.
+*   **Core Logic:** Located in `packages/sonic-core/src/dsp/zig`.
 
-*   **Name:** Sonic Forge
-*   **Description:** A professional-grade, local-first Progressive Web App (PWA) for audio mastering and processing. It bridges the gap between browser-based tools and desktop DAWs.
-*   **Core Philosophy:**
-    *   **Zero-Latency:** Real-time processing via AudioWorklets.
-    *   **High Performance:** Heavy offline processing via Zig/WebAssembly.
-    *   **Local-First:** All data remains on the user's device (IndexedDB); no server-side audio processing.
-    *   **Privacy-Centric:** No cloud dependencies for core functionality.
+## 2. Technical Map
 
-## 2. Technical Stack
+### The "Smart Tools" Workspace
+The main entry point for the user is `src/components/layout/SmartToolsWorkspace.tsx`.
+*   It manages two buffers: `sourceBuffer` and `processedBuffer`.
+*   When a tool runs, it calls `processAudioBuffer` from `src/services/Processor.ts`.
+*   Playback switches between buffers seamlessly using the `playbackMode` state.
 
-### Frontend & State
-*   **Framework:** React 18 (Vite)
-*   **Language:** TypeScript 5.x
-*   **State Management:** Zustand (Store), `idb-keyval` (Persistence)
-*   **Styling:** Tailwind CSS, `lucide-react` (Icons)
-*   **Routing:** Custom hash-based routing (`usePanelRouting`).
+### The Zig Bridge
+*   **Zig Source:** `packages/sonic-core/src/dsp/zig/main.zig`.
+*   **TS SDK:** `packages/sonic-core/src/sdk.ts`.
+*   **WASM Memory Workflow:** TS allocates memory in WASM -> copies data -> calls Zig function -> copies result out -> frees memory.
 
-### Audio Engine
-*   **API:** Web Audio API (standardized-audio-context)
-*   **Real-time DSP:** AudioWorklets (Pure JavaScript/TypeScript processors)
-*   **Offline DSP:** Zig 0.13.0 compiled to WebAssembly (WASM)
-*   **Threading:**
-    *   **Main Thread:** UI, State, Audio Graph Orchestration.
-    *   **Audio Thread:** Real-time processing (AudioWorklets).
-    *   **Worker Thread:** Offline processing (WASM/Zig bridge).
+### CLI / Headless Engine
+*   The CLI uses Puppeteer to "remote control" an instance of SonicPress.
+*   The bridge is defined in `src/main-headless.tsx` and exposed via `window.__SONICFORGE_BRIDGE__` (legacy naming preserved in internal bridge objects for compatibility).
 
-### CLI Tool
-*   **Framework:** Ink (React for CLI)
-*   **Engine:** Puppeteer (Headless Chrome for audio context)
-*   **Purpose:** Batch processing automation via terminal.
+## 3. Key Conventions
 
-## 3. Architecture Overview
+### DSP Performance
+*   Avoid large memory copies in tight loops.
+*   Prefer **Interleaved Stereo** when passing data to Zig for tools that need to "see" both channels (like Mono Bass).
+*   Always use `alloc` and `free` exported from WASM to prevent memory leaks in the linear memory space.
 
-Sonic Forge follows a strict **Three-Layer Architecture**:
+### UI / UX
+*   Maintain the "Dark Mode" aesthetic using Tailwind's `slate-950` and `blue-600` primary colors.
+*   Ensure all visualizers use the `ResponsiveCanvas` to properly handle high-DPI screens.
 
-1.  **Intent Layer (UI & Store):**
-    *   **Role:** Captures user actions and manages application state.
-    *   **Key Files:** `src/store/useAudioStore.ts`, `src/components/**/*.tsx`
-    *   **Behavior:** Updates the Zustand store, which triggers subscriptions to update the engine.
+## 4. Troubleshooting & FAQ
 
-2.  **Orchestration Layer (Audio Engine):**
-    *   **Role:** Translates state changes into Web Audio API calls.
-    *   **Key Files:** `packages/sonic-core/src/mixer.ts`, `packages/sonic-core/src/core/track-strip.ts`, `packages/sonic-core/src/core/bus-strip.ts`
-    *   **Behavior:** Manages `AudioContext`, `AudioNode` connections, and parameter automation (`setTargetAtTime`).
+*   **Audio doesn't play in CLI?** Check if Chromium is launched with `--autoplay-policy=no-user-gesture-required`.
+*   **WASM binary not found?** Ensure `npm run build:wasm` was successful and the file exists in `public/wasm/dsp.wasm`.
+*   **A/B comparison sounds the same?** Ensure `processedBuffer` was properly cloned from `sourceBuffer` before processing, otherwise you may be modifying the same object in memory.
 
-3.  **Processing Layer (DSP):**
-    *   **Role:** The actual math modifying audio samples.
-    *   **Key Files:** `packages/sonic-core/src/worklets/*.js` (Real-time), `packages/sonic-core/src/dsp/zig/*.zig` (Offline)
-    *   **Behavior:** Runs in isolated threads (Audio or Worker) to prevent UI blocking.
-
-## 4. Key Workflows & Features
-
-### A. Real-time Effects Rack ("The Trinity Pattern")
-Adding a new real-time effect requires three components:
-1.  **Processor (DSP):** `packages/sonic-core/src/worklets/[name]-processor.js` (Extends `AudioWorkletProcessor`).
-2.  **Node (Bridge):** `packages/sonic-core/src/worklets/[Name]Node.ts` (Extends `AudioWorkletNode`, handles parameter mapping).
-3.  **UI (Component):** `src/components/rack/[Name]Unit.tsx` (React controls).
-
-### B. Smart Processing (Zig/WASM)
-High-performance offline processing for file repair and normalization.
-*   **Source:** `packages/sonic-core/src/dsp/zig/main.zig`
-*   **Build:** `npm run build:wasm` (Outputs to `public/wasm/dsp.wasm`)
-*   **Bridge:** `packages/sonic-core/src/workers/offline-processor.worker.ts` loads WASM and manages memory (`alloc`/`free`).
-*   **UI:** `src/components/layout/panels/BatchProcessMenu.tsx`
-*   **Features:**
-    *   **Loudness Normalization:** Target specific LUFS (e.g., -14).
-    *   **Phase Rotation:** Recovers headroom by smearing transients.
-    *   **De-Clipper:** Repairs digital clipping via cubic interpolation.
-    *   **Spectral Denoise:** FFT-based noise reduction.
-    *   **Mono Bass:** Sums low frequencies to mono below a cutoff (e.g., 120Hz).
-
-### C. Multi-Track Mixer
-*   Supports multiple audio tracks with individual Volume, Pan, Mute, and Solo.
-*   Master Bus for global processing.
-*   **Drag & Drop:** Reorder effects in the rack.
-
-### D. Offline/Batch Workflow
-The "Smart Processing" panel offers two modes:
-1.  **Project Track Mode:** Destructively processes a track within the current project. Supports Undo/Redo.
-2.  **External File Mode:** Upload -> Process -> Preview (Scrubbable) -> Download. Does not affect the project.
-
-## 5. Development & Operations
-
-### Prerequisites
-*   Node.js 18+
-*   Zig 0.13.0+ (Required for `build:wasm`)
-
-### Commands
-*   `npm run dev`: Start Vite development server.
-*   `npm run build`: Build web application.
-*   `npm run build:wasm`: Compile Zig DSP to WebAssembly.
-*   `npm run build:cli`: Build CLI tool.
-*   `npm test`: Run Vitest suite.
-
-### File Structure Map
-```
-src/
-├── audio/              # Core Audio Engine
-│   ├── core/           # Track/Bus logic, Context management
-│   ├── dsp/zig/        # Zig source code for offline processing
-│   ├── workers/        # Web Workers & Client bridges
-│   ├── worklets/       # AudioWorklet processors & Node wrappers
-│   └── mixer.ts        # Main MixerEngine entry point
-├── components/         # React UI
-│   ├── layout/         # Workspace, Panels (Tools, Export)
-│   ├── rack/           # Effect units, Rack container
-│   └── mixer/          # Faders, Meters
-├── store/              # Zustand state stores
-├── utils/              # Helpers (WAV export, Logger)
-└── main.tsx            # App Entry
-```
-
-## 6. Known Constraints & Notes
-*   **AudioContext State:** Browsers require a user gesture to resume the AudioContext. The app handles this via the "Start" overlay.
-*   **WASM Memory:** The Zig allocator is a `GeneralPurposeAllocator`. The worker bridge manually handles `alloc` and `free` to prevent leaks.
-*   **Persistence:** Large audio files are stored in IndexedDB. Use `src/hooks/useProjectPersistence.ts` for managing saves.
-*   **CLI:** The CLI relies on `puppeteer-core`. Ensure a compatible Chrome/Chromium binary is available if running outside standard environments.
+## 5. Future Expansion
+When adding a new tool:
+1.  Add the algorithm to `main.zig`.
+2.  Export the function using `export fn`.
+3.  Add a wrapper in `sdk.ts`.
+4.  Expose it in `Processor.ts`.
+5.  Add a button to `SmartToolsWorkspace.tsx`.

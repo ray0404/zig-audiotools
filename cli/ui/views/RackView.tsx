@@ -2,9 +2,8 @@ import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import SelectInput from 'ink-select-input';
 import { useTUIStore } from '../store.js';
-import { AudioBridge } from '../../engine/audio-bridge.js';
-
-export const RackView = ({ bridge }: { bridge: AudioBridge }) => {
+import { SonicEngine } from '@sonic-core/index.js';
+export const RackView = ({ bridge }: { bridge: SonicEngine }) => {
   const { rack, metering, setView, setSelectedModuleId } = useTUIStore();
   const [highlightedIndex, setHighlightedIndex] = React.useState(0);
   const rackMetering = metering.rack;

@@ -1,8 +1,9 @@
 import { Command } from 'commander';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { AudioBridge } from './engine/audio-bridge.js';
+import { NativeEngine } from './engine/native-engine.js';
 import { runTUI } from './ui/index.js';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const program = new Command();
@@ -16,48 +17,38 @@ program
   .command('start')
   .description('Start the Interactive TUI')
   .option('-d, --debug', 'Enable debug logging')
+  .option('--headless', 'Use legacy headless browser engine')
   .action(async (options) => {
     console.log('Starting Sonic Forge TUI...');
 
-    // Simplified path logic
     const isRunningFromDist = __dirname.includes(path.join('dist', 'cli'));
-    // If running from dist/cli/index.js, the headless file is in dist/cli/headless.html (or dist/headless.html copied there)
-    // If running via tsx from cli/index.ts, the built headless file is in dist/headless.html
-    
-    let staticDir: string;
-    let fileName = 'headless.html';
+    let wasmPath: string;
 
     if (isRunningFromDist) {
-        // We are in dist/cli. We want to serve dist/ which is one level up.
-        staticDir = path.resolve(__dirname, '..');
+        wasmPath = path.resolve(__dirname, '..', 'wasm', 'dsp.wasm');
     } else {
-        // We are in cli/. We want to serve dist/ which is ../dist
-        staticDir = path.resolve(__dirname, '..', 'dist');
+        wasmPath = path.resolve(__dirname, '..', 'public', 'wasm', 'dsp.wasm');
     }
 
-    const headlessPath = path.join(staticDir, fileName);
-
-    // Verify existence
-    const fs = await import('fs');
-    if (!fs.existsSync(headlessPath)) {
-        console.error(`Error: Could not find headless engine at "${headlessPath}".`);
-        if (!isRunningFromDist) {
-            console.error('Hint: You might need to run "npm run build" first.');
-        }
+    if (!fs.existsSync(wasmPath)) {
+        console.error(`Error: Could not find DSP WASM at "${wasmPath}".`);
         process.exit(1);
     }
 
     try {
-      // 1. Launch the Headless Bridge with static serving
-      const bridge = new AudioBridge(staticDir, fileName, options.debug);
-      await bridge.init();
-      if (options.debug) console.log('Engine Connected.');
-
-      // 2. Launch TUI
-      await runTUI(bridge);
-
-      // Cleanup on exit
-      await bridge.close();
+      if (options.headless) {
+          const { AudioBridge } = await import('./engine/audio-bridge.js');
+          let staticDir = isRunningFromDist ? path.resolve(__dirname, '..') : path.resolve(__dirname, '..', 'dist');
+          const bridge = new AudioBridge(staticDir, 'headless.html', options.debug);
+          await bridge.init();
+          await runTUI(bridge);
+          await bridge.close();
+      } else {
+          const engine = new NativeEngine(wasmPath);
+          await engine.init();
+          await runTUI(engine);
+          await engine.close();
+      }
       process.exit(0);
 
     } catch (error) {

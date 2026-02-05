@@ -2,9 +2,8 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import { useTUIStore } from '../store.js';
-import { AudioBridge } from '../../engine/audio-bridge.js';
-
-export const AddModuleView = ({ bridge }: { bridge: AudioBridge }) => {
+import { SonicEngine } from '@sonic-core/index.js';
+export const AddModuleView = ({ bridge }: { bridge: SonicEngine }) => {
   const { setView, moduleDescriptors } = useTUIStore();
 
   const availableTypes = Object.keys(moduleDescriptors);

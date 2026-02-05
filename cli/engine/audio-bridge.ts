@@ -5,8 +5,9 @@ import express from 'express';
 import { Server } from 'http';
 import { AddressInfo } from 'net';
 import { useTUIStore, TUIState } from '../ui/store.js';
+import { SonicEngine, PlaybackState, MeteringData, RackModule } from '@sonic-core/index.js';
 
-export class AudioBridge extends EventEmitter {
+export class AudioBridge extends EventEmitter implements SonicEngine {
   private browser: any;
   private page: any;
   private server: Server | null = null;

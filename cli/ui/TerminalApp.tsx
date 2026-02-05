@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Box, useInput, useApp } from 'ink';
-import { AudioBridge } from '../engine/audio-bridge.js';
+import { SonicEngine } from '@sonic-core/index.js';
 import { useTUIStore } from './store.js';
 
 // Import Views
@@ -11,7 +11,7 @@ import { ModuleEditView } from './views/ModuleEditView.js';
 import { LoadFileView } from './views/LoadFileView.js';
 import { ExportView } from './views/ExportView.js';
 
-export const TerminalApp = ({ bridge }: { bridge: AudioBridge }) => {
+export const TerminalApp = ({ bridge }: { bridge: SonicEngine }) => {
   const { view, setView, setRack, setPlayback, setMessage, setModuleDescriptors, playback } = useTUIStore();
   const { exit } = useApp();
 

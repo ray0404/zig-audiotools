@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { useTUIStore } from '../store.js';
-import { AudioBridge } from '../../engine/audio-bridge.js';
-
-export const ModuleEditView = ({ bridge }: { bridge: AudioBridge }) => {
+import { SonicEngine } from '@sonic-core/index.js';
+export const ModuleEditView = ({ bridge }: { bridge: SonicEngine }) => {
   const { rack, selectedModuleId, setView, moduleDescriptors, metering } = useTUIStore();
   const module = rack.find(m => m.id === selectedModuleId);
   const meter = metering.rack[module?.id || ''];
