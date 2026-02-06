@@ -19,6 +19,10 @@ export const SmartToolsWorkspace: React.FC = () => {
     const [status, setStatus] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>('');
     
+    // Tool state
+    const [tapeNominalFreq, setTapeNominalFreq] = useState(60);
+    const [tapeCorrection, setTapeCorrection] = useState(1.0);
+
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackMode, setPlaybackMode] = useState<'source' | 'processed'>('processed');
@@ -259,6 +263,48 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
+
+                            <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex flex-col gap-3 mt-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                                        <Wand2 size={14} />
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-300">Tape Stabilizer</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase">Reference Freq</label>
+                                    <select
+                                        value={tapeNominalFreq}
+                                        onChange={(e) => setTapeNominalFreq(Number(e.target.value))}
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-blue-600"
+                                    >
+                                        <option value={60}>60Hz (Mains Hum)</option>
+                                        <option value={50}>50Hz (Mains Hum)</option>
+                                        <option value={15000}>15kHz (Pilot)</option>
+                                    </select>
+
+                                    <label className="text-[10px] text-slate-500 font-bold uppercase">Correction</label>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="range"
+                                            min="0" max="1" step="0.01"
+                                            value={tapeCorrection}
+                                            onChange={(e) => setTapeCorrection(Number(e.target.value))}
+                                            className="flex-1 accent-blue-600 bg-slate-800 h-1 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <span className="text-xs w-8 text-right text-slate-400">{(tapeCorrection * 100).toFixed(0)}%</span>
+                                    </div>
+
+                                    <button
+                                        onClick={() => runTool('tapeStabilizer', 'Tape Stabilizer', { nominalFreq: tapeNominalFreq, correctionAmount: tapeCorrection })}
+                                        disabled={!sourceBuffer || isProcessing}
+                                        className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-lg border border-slate-700 transition-colors font-medium disabled:opacity-50"
+                                    >
+                                        Apply
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </section>
 

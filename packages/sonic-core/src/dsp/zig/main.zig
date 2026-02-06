@@ -1,6 +1,9 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
 
+// Ensure tape_stabilizer exports are included
+pub usingnamespace @import("tape_stabilizer.zig");
+
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
