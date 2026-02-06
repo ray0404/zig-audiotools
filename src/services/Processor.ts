@@ -24,7 +24,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -36,6 +36,26 @@ export async function processAudioBuffer(
         numberOfChannels: numChannels,
         sampleRate: sampleRate
     });
+
+    if (tool === 'debleed') {
+        if (numChannels < 2) {
+            // Passthrough for mono
+            newBuffer.copyToChannel(audioBuffer.getChannelData(0), 0);
+            return newBuffer;
+        }
+
+        const target = audioBuffer.getChannelData(0);
+        const source = audioBuffer.getChannelData(1);
+
+        const sensitivity = params?.sensitivity ?? 0.5;
+        const threshold = params?.threshold ?? -40;
+
+        const processed = sdk.processDebleed(target, source, sensitivity, threshold);
+
+        newBuffer.copyToChannel(processed, 0);
+        newBuffer.copyToChannel(source, 1); // Keep source as is
+        return newBuffer;
+    }
 
     // Special handling for stereo tools
     if (tool === 'monoBass' && numChannels === 2) {

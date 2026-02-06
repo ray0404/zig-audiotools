@@ -2,6 +2,7 @@ const std = @import("std");
 const math = @import("math_utils.zig");
 const plosive = @import("plosiveguard.zig");
 const voice_isolate = @import("voice_isolate.zig");
+const debleed = @import("debleed.zig");
 
 // Import SmartLevel module to ensure its exported functions are included
 pub usingnamespace @import("smart_level.zig");
@@ -448,4 +449,15 @@ export fn process_psychodynamic(
 
         i += current_block_size;
     }
+}
+
+// --- 9. DeBleed Lite ---
+
+export fn process_debleed(ptr_target: [*]f32, ptr_source: [*]f32, len: usize, sensitivity: f32, threshold: f32) void {
+    const target = ptr_target[0..len];
+    const source = ptr_source[0..len];
+    debleed.process(allocator, target, source, sensitivity, threshold) catch |err| {
+        // Ignore allocation errors for now in WASM context (or log if possible)
+        _ = err;
+    };
 }
