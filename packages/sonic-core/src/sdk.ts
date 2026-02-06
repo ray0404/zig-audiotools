@@ -77,4 +77,17 @@ export class SonicForgeSDK {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
   }
+
+  processPlosiveGuard(
+    channelData: Float32Array,
+    sampleRate: number,
+    sensitivity: number,
+    strength: number,
+    cutoff: number
+  ): Float32Array {
+    const { process_plosiveguard } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) =>
+      process_plosiveguard(ptr, len, sampleRate, sensitivity, strength, cutoff)
+    );
+  }
 }
