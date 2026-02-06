@@ -52,8 +52,8 @@ export async function processAudioBuffer(
 
         const processed = sdk.processDebleed(target, source, sensitivity, threshold);
 
-        newBuffer.copyToChannel(processed, 0);
-        newBuffer.copyToChannel(source, 1); // Keep source as is
+        newBuffer.copyToChannel(processed as any, 0);
+        newBuffer.copyToChannel(source as any, 1); // Keep source as is
         return newBuffer;
     }
 
