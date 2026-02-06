@@ -77,4 +77,19 @@ export class SonicForgeSDK {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
   }
+
+  processTapeStabilizer(
+    channelData: Float32Array,
+    sampleRate: number,
+    nominalFreq: number,
+    scanFreqMin: number,
+    scanFreqMax: number,
+    correctionAmount: number
+  ): Float32Array {
+    const { process_tapestabilizer } = this.wasmInstance!.exports as any;
+    return this.processBuffer(
+      channelData,
+      (ptr, len) => process_tapestabilizer(ptr, len, sampleRate, nominalFreq, scanFreqMin, scanFreqMax, correctionAmount)
+    );
+  }
 }

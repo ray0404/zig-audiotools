@@ -107,3 +107,18 @@ pub fn linearToDb(linear: f32) f32 {
     if (linear <= 0.000001) return -120.0;
     return 20.0 * std.math.log10(linear);
 }
+
+pub fn cubicHermite(y0: f32, y1: f32, y2: f32, y3: f32, mu: f32) f32 {
+    const mu2 = mu * mu;
+    const mu3 = mu2 * mu;
+
+    const m0 = (y2 - y0) * 0.5;
+    const m1 = (y3 - y1) * 0.5;
+
+    const a0 = 2.0 * mu3 - 3.0 * mu2 + 1.0;
+    const a1 = mu3 - 2.0 * mu2 + mu;
+    const a2 = -2.0 * mu3 + 3.0 * mu2;
+    const a3 = mu3 - mu2;
+
+    return a0 * y1 + a1 * m0 + a2 * y2 + a3 * m1;
+}

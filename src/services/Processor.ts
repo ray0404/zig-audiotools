@@ -25,7 +25,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'tapeStabilizer',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -83,6 +83,22 @@ export async function processAudioBuffer(
             case 'monoBass':
                 // For mono tracks, it just applies filters
                 processed = sdk.processMonoBass(channelData, sampleRate, params?.cutoff || 120);
+                break;
+            case 'tapeStabilizer':
+                const nom = params?.nominalFreq || 60;
+                let min = params?.scanFreqMin;
+                let max = params?.scanFreqMax;
+                if (!min) min = nom * 0.8;
+                if (!max) max = nom * 1.2;
+
+                processed = sdk.processTapeStabilizer(
+                    channelData,
+                    sampleRate,
+                    nom,
+                    min,
+                    max,
+                    params?.correctionAmount !== undefined ? params.correctionAmount : 1.0
+                );
                 break;
             default:
                 processed = new Float32Array(channelData);
