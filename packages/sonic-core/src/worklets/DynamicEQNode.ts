@@ -1,4 +1,4 @@
-import { logger } from "@/utils/logger";
+import { logger } from "../../../../src/utils/logger.js";
 import { AudioWorkletNode, IAudioContext, IOfflineAudioContext, TAudioWorkletNodeConstructor } from "standardized-audio-context";
 
 const AudioWorkletNodeBase = AudioWorkletNode as TAudioWorkletNodeConstructor;

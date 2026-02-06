@@ -1,5 +1,5 @@
 import { AudioWorkletNode, IAudioContext, IOfflineAudioContext, TAudioWorkletNodeConstructor } from "standardized-audio-context";
-import { logger } from "@/utils/logger";
+import { logger } from "../../../../src/utils/logger.js";
 
 export interface ParametricEQOptions {
     lowFreq: number;

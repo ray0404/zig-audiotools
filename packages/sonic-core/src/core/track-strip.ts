@@ -7,10 +7,10 @@ import {
     IStereoPannerNode,
     IAnalyserNode
 } from "standardized-audio-context";
-import { ContextManager } from "./context-manager";
-import type { RackModule } from "../types";
-import { NodeFactory } from "./node-factory";
-import { ConvolutionNode } from "../worklets/ConvolutionNode";
+import { ContextManager } from "./context-manager.js";
+import type { RackModule } from "../types.js";
+import { NodeFactory } from "./node-factory.js";
+import { ConvolutionNode } from "../worklets/ConvolutionNode.js";
 
 export class TrackStrip {
     public id: string;

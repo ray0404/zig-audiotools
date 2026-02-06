@@ -171,6 +171,64 @@ const DESCRIPTORS: Record<string, Omit<ModuleDescriptor, 'type'>> = {
           { name: 'gainHigh', defaultValue: 0, minValue: -24, maxValue: 24 },
           { name: 'bypass', defaultValue: 0, minValue: 0, maxValue: 1 }
       ]
+  },
+  LOUDNESS_METER: {
+      params: [
+          { name: 'targetLufs', defaultValue: -14, minValue: -24, maxValue: -6 },
+      ]
+  },
+  DE_CLIP: {
+      params: []
+  },
+  PHASE_ROTATION: {
+      params: []
+  },
+  SPECTRAL_DENOISE: {
+      params: []
+  },
+  MONO_BASS: {
+      params: [
+          { name: 'frequency', defaultValue: 120, minValue: 20, maxValue: 500 },
+      ]
+  },
+  PLOSIVE_GUARD: {
+      params: [
+          { name: 'sensitivity', defaultValue: 0.5, minValue: 0, maxValue: 1 },
+          { name: 'strength', defaultValue: 0.5, minValue: 0, maxValue: 1 },
+          { name: 'cutoff', defaultValue: 200, minValue: 20, maxValue: 1000 },
+      ]
+  },
+  VOICE_ISOLATE: {
+      params: [
+          { name: 'amount', defaultValue: 0.5, minValue: 0, maxValue: 1 },
+      ]
+  },
+  SMART_LEVEL: {
+      params: [
+          { name: 'targetLufs', defaultValue: -14, minValue: -24, maxValue: -6 },
+          { name: 'maxGainDb', defaultValue: 12, minValue: 0, maxValue: 24 },
+          { name: 'gateThresholdDb', defaultValue: -60, minValue: -100, maxValue: -30 },
+      ]
+  },
+  DE_BLEED: {
+      params: [
+          { name: 'sensitivity', defaultValue: 0.5, minValue: 0, maxValue: 1 },
+          { name: 'threshold', defaultValue: -40, minValue: -100, maxValue: 0 },
+      ]
+  },
+  TAPE_STABILIZER: {
+      params: [
+          { name: 'nominalFreq', defaultValue: 3150, minValue: 1000, maxValue: 5000 },
+          { name: 'scanMin', defaultValue: 3000, minValue: 1000, maxValue: 5000 },
+          { name: 'scanMax', defaultValue: 3300, minValue: 1000, maxValue: 5000 },
+          { name: 'amount', defaultValue: 0.5, minValue: 0, maxValue: 1 },
+      ]
+  },
+  ECHO_VANISH: {
+      params: [
+          { name: 'amount', defaultValue: 0.5, minValue: 0, maxValue: 1 },
+          { name: 'tailMs', defaultValue: 500, minValue: 10, maxValue: 2000 },
+      ]
   }
 };
 

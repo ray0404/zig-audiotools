@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { useTUIStore } from '../store.js';
-import { SonicEngine } from '@sonic-core/index.js';
+import { SonicEngine } from '../../../packages/sonic-core/src/index.js';
 import fs from 'fs';
 import path from 'path';
 

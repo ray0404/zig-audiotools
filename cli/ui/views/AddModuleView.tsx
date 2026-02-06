@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import SelectInput from 'ink-select-input';
 import { useTUIStore } from '../store.js';
-import { SonicEngine } from '@sonic-core/index.js';
+import { SonicEngine, RackModuleType } from '../../../packages/sonic-core/src/index.js';
 export const AddModuleView = ({ bridge }: { bridge: SonicEngine }) => {
   const { setView, moduleDescriptors } = useTUIStore();
 
@@ -16,7 +16,7 @@ export const AddModuleView = ({ bridge }: { bridge: SonicEngine }) => {
       <SelectInput limit={10} items={items} onSelect={async (item) => {
         if (item.value === 'BACK') setView('RACK');
         else {
-          await bridge.addModule(item.value);
+          await bridge.addModule(item.value as any);
           setView('RACK');
         }
       }} />

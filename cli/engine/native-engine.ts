@@ -3,9 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import decode from 'audio-decode';
-import { SonicEngine, PlaybackState, MeteringData, RackModule, RackModuleType } from '@sonic-core/index.js';
-import { SonicForgeSDK } from '@sonic-core/sdk.js';
-import { getModuleDescriptors } from '@sonic-core/module-descriptors.js';
+import { SonicEngine, PlaybackState, MeteringData, RackModule, RackModuleType } from '../../packages/sonic-core/src/index.js';
+import { SonicForgeSDK } from '../../packages/sonic-core/src/sdk.js';
+import { getModuleDescriptors } from '../../packages/sonic-core/src/module-descriptors.js';
+import { encodeWAV } from '../../src/utils/wav-export.js';
+import * as OfflineDSP from '../../packages/sonic-core/src/core/offline-processors.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -14,6 +16,7 @@ export class NativeEngine implements SonicEngine {
   private rack: RackModule[] = [];
   private sourceBuffer: Float32Array | null = null; // Assuming mono for now or interleaved
   private processedBuffer: Float32Array | null = null;
+  private numChannels: number = 1;
   private sampleRate: number = 44100;
   private duration: number = 0;
   private isPlaying: boolean = false;
@@ -23,7 +26,11 @@ export class NativeEngine implements SonicEngine {
 
   async init() {
     const wasmBuffer = fs.readFileSync(this.wasmPath);
-    this.sdk = new SonicForgeSDK(wasmBuffer);
+    const arrayBuffer = wasmBuffer.buffer.slice(
+      wasmBuffer.byteOffset, 
+      wasmBuffer.byteOffset + wasmBuffer.byteLength
+    ) as ArrayBuffer;
+    this.sdk = new SonicForgeSDK(arrayBuffer);
     await this.sdk.init();
   }
 
@@ -35,7 +42,8 @@ export class NativeEngine implements SonicEngine {
     const audio = await decode(buffer);
     // audio-decode returns an AudioBuffer-like object
     // We'll take the first channel for simplicity or interleave if stereo
-    if (audio.numberOfChannels === 2) {
+    this.numChannels = audio.numberOfChannels;
+    if (this.numChannels === 2) {
         this.sourceBuffer = this.interleave(audio.getChannelData(0), audio.getChannelData(1));
     } else {
         this.sourceBuffer = audio.getChannelData(0);
@@ -58,7 +66,7 @@ export class NativeEngine implements SonicEngine {
   private applyRack() {
     if (!this.sourceBuffer || !this.sdk) return;
     
-    let current = new Float32Array(this.sourceBuffer);
+    let current: any = new Float32Array(this.sourceBuffer);
     
     for (const mod of this.rack) {
       if (mod.bypass) continue;
@@ -67,14 +75,95 @@ export class NativeEngine implements SonicEngine {
         case 'LOUDNESS_METER': 
              current = this.sdk.processLufsNormalize(current, mod.parameters.targetLufs || -14);
              break;
-        case 'PHASER': // Using as proxy for phase rotation for now if needed, or map correctly
-             current = this.sdk.processPhaseRotation(current);
-             break;
-        case 'BITCRUSHER': // Proxy for De-clip or similar if we want to test
+        case 'DE_CLIP':
              current = this.sdk.processDeclip(current);
              break;
-        // The "Smart Tools" mapping
-        // In the TUI, we should probably add specific types for these
+        case 'PHASE_ROTATION':
+             current = this.sdk.processPhaseRotation(current);
+             break;
+        case 'SPECTRAL_DENOISE':
+             current = this.sdk.processSpectralDenoise(current);
+             break;
+        case 'MONO_BASS':
+             current = this.sdk.processMonoBass(current, this.sampleRate, mod.parameters.frequency || 120);
+             break;
+        case 'PLOSIVE_GUARD':
+             current = this.sdk.processPlosiveGuard(
+               current, 
+               this.sampleRate, 
+               mod.parameters.sensitivity || 0.5, 
+               mod.parameters.strength || 0.5, 
+               mod.parameters.cutoff || 200
+             );
+             break;
+        case 'VOICE_ISOLATE':
+             current = this.sdk.processVoiceIsolate(current, mod.parameters.amount || 0.5);
+             break;
+        case 'SMART_LEVEL':
+             current = this.sdk.processSmartLevel(
+               current, 
+               mod.parameters.targetLufs || -14, 
+               mod.parameters.maxGainDb || 12, 
+               mod.parameters.gateThresholdDb || -60
+             );
+             break;
+        case 'TAPE_STABILIZER':
+             current = this.sdk.processTapeStabilizer(
+               current, 
+               this.sampleRate, 
+               mod.parameters.nominalFreq || 3150, 
+               mod.parameters.scanMin || 3000, 
+               mod.parameters.scanMax || 3300, 
+               mod.parameters.amount || 0.5
+             );
+             break;
+        case 'ECHO_VANISH':
+             current = this.sdk.processEchoVanish(
+               current, 
+               this.sampleRate, 
+               mod.parameters.amount || 0.5, 
+               mod.parameters.tailMs || 500
+             );
+             break;
+        case 'BITCRUSHER':
+             current = OfflineDSP.applyBitCrusher(
+               current, 
+               mod.parameters.bits || 8, 
+               mod.parameters.normFreq || 1, 
+               mod.parameters.mix || 1
+             );
+             break;
+        case 'SATURATION':
+             current = OfflineDSP.applySaturation(
+               current, 
+               mod.parameters.drive || 0, 
+               mod.parameters.type || 1, 
+               mod.parameters.outputGain || 0, 
+               mod.parameters.mix || 1
+             );
+             break;
+        case 'PARAMETRIC_EQ':
+             current = OfflineDSP.applyParametricEQ(current, this.sampleRate, {
+                lowFreq: mod.parameters.lowFreq || 100,
+                lowGain: mod.parameters.lowGain || 0,
+                midFreq: mod.parameters.midFreq || 1000,
+                midGain: mod.parameters.midGain || 0,
+                midQ: mod.parameters.midQ || 0.707,
+                highFreq: mod.parameters.highFreq || 5000,
+                highGain: mod.parameters.highGain || 0,
+             });
+             break;
+        case 'COMPRESSOR':
+             current = OfflineDSP.applyCompressor(current, this.sampleRate, {
+                threshold: mod.parameters.threshold || -24,
+                ratio: mod.parameters.ratio || 4,
+                attack: mod.parameters.attack || 0.01,
+                release: mod.parameters.release || 0.1,
+                makeupGain: mod.parameters.makeupGain || 0,
+                mix: mod.parameters.mix || 1
+             });
+             break;
+        // For modules that are NOT Zig-based yet in the CLI, we skip or add placeholders
       }
     }
     
@@ -91,11 +180,21 @@ export class NativeEngine implements SonicEngine {
 
   async addModule(type: RackModuleType) {
     const id = Math.random().toString(36).substr(2, 9);
+    const descriptors = getModuleDescriptors();
+    const descriptor = descriptors[type];
+    const parameters: Record<string, any> = {};
+    
+    if (descriptor) {
+      for (const p of descriptor.params) {
+        parameters[p.name] = p.defaultValue;
+      }
+    }
+
     this.rack.push({
       id,
       type,
       bypass: false,
-      parameters: {} // Should populate with defaults from descriptors
+      parameters
     });
     this.applyRack();
   }
@@ -153,9 +252,22 @@ export class NativeEngine implements SonicEngine {
 
   async exportAudio(outputPath: string): Promise<boolean> {
     if (!this.processedBuffer) return false;
-    // Here we'd use a wav encoder
-    // For now, just a placeholder success
-    return true;
+    
+    try {
+      const wavBuffer = encodeWAV(
+        this.processedBuffer, 
+        this.numChannels, 
+        this.sampleRate, 
+        this.numChannels === 2 ? 1 : 1, // Format 1 is PCM
+        16 // Default to 16-bit for now
+      );
+      
+      fs.writeFileSync(outputPath, Buffer.from(wavBuffer));
+      return true;
+    } catch (e) {
+      console.error('Export error:', e);
+      return false;
+    }
   }
 
   async close() {

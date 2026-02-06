@@ -1,6 +1,6 @@
 import { AudioContext, IAudioContext, IOfflineAudioContext } from "standardized-audio-context";
-import { logger } from "@/utils/logger";
-import { WorkletProvider } from "./types";
+import { logger } from "../../../../src/utils/logger.js";
+import { WorkletProvider } from "./types.js";
 
 export class ContextManager {
   private static _context: IAudioContext | null = null;

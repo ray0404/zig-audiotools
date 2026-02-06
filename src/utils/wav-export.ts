@@ -36,7 +36,7 @@ function interleave(inputL: Float32Array, inputR: Float32Array) {
   return result;
 }
 
-function encodeWAV(samples: Float32Array, numChannels: number, sampleRate: number, format: number, bitDepth: number) {
+export function encodeWAV(samples: Float32Array, numChannels: number, sampleRate: number, format: number, bitDepth: number) {
   const bytesPerSample = bitDepth / 8;
   const blockAlign = numChannels * bytesPerSample;
   

@@ -3,7 +3,7 @@ import { Box, Text, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import Spinner from 'ink-spinner';
 import { useTUIStore } from '../store.js';
-import { SonicEngine } from '@sonic-core/index.js';
+import { SonicEngine } from '../../../packages/sonic-core/src/index.js';
 import path from 'path';
 
 const InputListener = ({ onEsc }: { onEsc: () => void }) => {

@@ -1,27 +1,27 @@
 import { IAudioContext, IOfflineAudioContext, IAudioNode } from "standardized-audio-context";
-import type { RackModule } from "../types";
-import { logger } from "@/utils/logger";
+import type { RackModule } from "../types.js";
+import { logger } from "../../../../src/utils/logger.js";
 
-import { DynamicEQNode } from "../worklets/DynamicEQNode";
-import { TransientShaperNode } from "../worklets/TransientShaperNode";
-import { LimiterNode } from "../worklets/LimiterNode";
-import { MidSideEQNode } from "../worklets/MidSideEQNode";
-import { MeteringNode } from "../worklets/MeteringNode";
-import { ConvolutionNode } from "../worklets/ConvolutionNode";
-import { SaturationNode } from "../worklets/SaturationNode";
-import { DitheringNode } from "../worklets/DitheringNode";
-import { ParametricEQNode } from "../worklets/ParametricEQNode";
-import { DistortionNode } from "../worklets/DistortionNode";
-import { BitCrusherNode } from "../worklets/BitCrusherNode";
-import { ChorusNode } from "../worklets/ChorusNode";
-import { PhaserNode } from "../worklets/PhaserNode";
-import { TremoloNode } from "../worklets/TremoloNode";
-import { AutoWahNode } from "../worklets/AutoWahNode";
-import { FeedbackDelayNode } from "../worklets/FeedbackDelayNode";
-import { CompressorNode } from "../worklets/CompressorNode";
-import { DeEsserNode } from "../worklets/DeEsserNode";
-import { StereoImagerNode } from "../worklets/StereoImagerNode";
-import { MultibandCompressorNode } from "../worklets/MultibandCompressorNode";
+import { DynamicEQNode } from "../worklets/DynamicEQNode.js";
+import { TransientShaperNode } from "../worklets/TransientShaperNode.js";
+import { LimiterNode } from "../worklets/LimiterNode.js";
+import { MidSideEQNode } from "../worklets/MidSideEQNode.js";
+import { MeteringNode } from "../worklets/MeteringNode.js";
+import { ConvolutionNode } from "../worklets/ConvolutionNode.js";
+import { SaturationNode } from "../worklets/SaturationNode.js";
+import { DitheringNode } from "../worklets/DitheringNode.js";
+import { ParametricEQNode } from "../worklets/ParametricEQNode.js";
+import { DistortionNode } from "../worklets/DistortionNode.js";
+import { BitCrusherNode } from "../worklets/BitCrusherNode.js";
+import { ChorusNode } from "../worklets/ChorusNode.js";
+import { PhaserNode } from "../worklets/PhaserNode.js";
+import { TremoloNode } from "../worklets/TremoloNode.js";
+import { AutoWahNode } from "../worklets/AutoWahNode.js";
+import { FeedbackDelayNode } from "../worklets/FeedbackDelayNode.js";
+import { CompressorNode } from "../worklets/CompressorNode.js";
+import { DeEsserNode } from "../worklets/DeEsserNode.js";
+import { StereoImagerNode } from "../worklets/StereoImagerNode.js";
+import { MultibandCompressorNode } from "../worklets/MultibandCompressorNode.js";
 
 export class NodeFactory {
     static create(module: RackModule, context: IAudioContext | IOfflineAudioContext, assets: Record<string, AudioBuffer>): IAudioNode<IAudioContext | IOfflineAudioContext> | ConvolutionNode | null {

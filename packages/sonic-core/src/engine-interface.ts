@@ -1,6 +1,3 @@
-
-import { RackModule, RackModuleType } from './types';
-
 export interface PlaybackState {
   isPlaying: boolean;
   currentTime: number;
@@ -12,9 +9,12 @@ export interface MeteringData {
   peakLevels: number[];
 }
 
+import { RackModule, RackModuleType } from './types.js';
+import { ModuleDescriptor } from './module-descriptors.js';
+
 export interface SonicEngine {
   init(): Promise<void>;
-  getModuleDescriptors(): Promise<Record<string, any>>;
+  getModuleDescriptors(): Promise<Record<string, ModuleDescriptor>>;
   loadAudio(buffer: ArrayBuffer | Buffer): Promise<void>;
   updateParam(moduleId: string, paramId: string, value: number): Promise<void>;
   addModule(type: RackModuleType): Promise<void>;
