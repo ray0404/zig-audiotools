@@ -1,5 +1,6 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
+const echovanish = @import("echovanish.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -376,4 +377,10 @@ export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32
         data[i] = low_mono + high_l;
         data[i+1] = low_mono + high_r;
     }
+}
+
+// --- 6. Echo Vanish (De-Reverb) ---
+
+export fn process_echovanish(ptr: [*]f32, len: usize, sample_rate: f32, reduction_amount: f32, tail_length_ms: f32) void {
+    echovanish.process_echovanish(ptr, len, sample_rate, reduction_amount, tail_length_ms);
 }

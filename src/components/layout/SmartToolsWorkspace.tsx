@@ -6,10 +6,11 @@ import { saveAs } from 'file-saver';
 import { 
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
-    Settings2, ChevronRight
+    Settings2, ChevronRight, Wind
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
+import { EchoVanishPanel } from '@/components/tools/EchoVanishPanel';
 
 export const SmartToolsWorkspace: React.FC = () => {
     const [, setIsSdkReady] = useState(false);
@@ -18,6 +19,7 @@ export const SmartToolsWorkspace: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>('');
+    const [activeToolPanel, setActiveToolPanel] = useState<'echoVanish' | null>(null);
     
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
@@ -259,6 +261,12 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
+                            <ToolButton
+                                icon={<Wind size={14} />}
+                                label="Echo Vanish"
+                                onClick={() => setActiveToolPanel('echoVanish')}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
                         </div>
                     </section>
 
@@ -292,6 +300,15 @@ export const SmartToolsWorkspace: React.FC = () => {
 
                 {/* Content Area */}
                 <section className="flex-1 flex flex-col bg-slate-950 relative">
+                    {activeToolPanel === 'echoVanish' && (
+                        <EchoVanishPanel
+                            onApply={(params) => {
+                                setActiveToolPanel(null);
+                                runTool('echoVanish', 'Echo Vanish', params);
+                            }}
+                            onCancel={() => setActiveToolPanel(null)}
+                        />
+                    )}
                     {!sourceBuffer ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4">
                             <div className="w-20 h-20 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-2">
