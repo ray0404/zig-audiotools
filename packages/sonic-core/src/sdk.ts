@@ -46,7 +46,9 @@ export class SonicForgeSDK {
       processFn(ptr, channelData.length, ...extraArgs);
 
       // 4. Return processed data (copying out of WASM memory)
-      return new Float32Array(wasmSlice);
+      // Must recreate view because memory might have grown during processing
+      const resultSlice = new Float32Array(this.memory.buffer, ptr, channelData.length);
+      return new Float32Array(resultSlice);
     } finally {
       // 5. Cleanup
       free(ptr, channelData.length);
@@ -76,5 +78,30 @@ export class SonicForgeSDK {
   processMonoBass(channelData: Float32Array, sampleRate: number, cutoffFreq: number): Float32Array {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
+  }
+
+  analyzeReference(channelData: Float32Array): number {
+    if (!this.wasmInstance || !this.memory) throw new Error('SDK not initialized');
+    const { alloc, free, spectralmatch_analyze_ref } = this.wasmInstance.exports as any;
+
+    const ptr = alloc(channelData.length);
+    try {
+      const wasmSlice = new Float32Array(this.memory.buffer, ptr, channelData.length);
+      wasmSlice.set(channelData);
+      return spectralmatch_analyze_ref(ptr, channelData.length);
+    } finally {
+      free(ptr, channelData.length);
+    }
+  }
+
+  freeAnalysis(ptr: number) {
+    if (!this.wasmInstance) return;
+    const { spectralmatch_free_analysis } = this.wasmInstance.exports as any;
+    spectralmatch_free_analysis(ptr);
+  }
+
+  processSpectralMatch(channelData: Float32Array, refPtr: number, amount: number, smooth: number): Float32Array {
+    const { process_spectralmatch } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_spectralmatch(ptr, len, refPtr, amount, smooth));
   }
 }
