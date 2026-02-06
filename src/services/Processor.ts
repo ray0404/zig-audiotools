@@ -25,7 +25,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'smartLevel',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -83,6 +83,14 @@ export async function processAudioBuffer(
             case 'monoBass':
                 // For mono tracks, it just applies filters
                 processed = sdk.processMonoBass(channelData, sampleRate, params?.cutoff || 120);
+                break;
+            case 'smartLevel':
+                processed = sdk.processSmartLevel(
+                    channelData,
+                    params?.targetLufs || -16,
+                    params?.maxGainDb || 6,
+                    params?.gateThresholdDb || -50
+                );
                 break;
             default:
                 processed = new Float32Array(channelData);

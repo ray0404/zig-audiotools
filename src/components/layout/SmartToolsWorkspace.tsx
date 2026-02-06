@@ -6,7 +6,7 @@ import { saveAs } from 'file-saver';
 import { 
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
-    Settings2, ChevronRight
+    Settings2, ChevronRight, Activity
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
@@ -257,6 +257,12 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 icon={<ChevronRight size={14} />} 
                                 label="Mono Bass" 
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
+                            <ToolButton
+                                icon={<Activity size={14} />}
+                                label="Smart Level"
+                                onClick={() => runTool('smartLevel', 'Smart Level', { targetLufs: -16, maxGainDb: 6 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
                         </div>

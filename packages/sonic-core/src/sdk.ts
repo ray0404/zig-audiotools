@@ -46,7 +46,9 @@ export class SonicForgeSDK {
       processFn(ptr, channelData.length, ...extraArgs);
 
       // 4. Return processed data (copying out of WASM memory)
-      return new Float32Array(wasmSlice);
+      // Note: We must access memory.buffer again in case WASM memory grew during execution
+      const outputView = new Float32Array(this.memory.buffer, ptr, channelData.length);
+      return new Float32Array(outputView);
     } finally {
       // 5. Cleanup
       free(ptr, channelData.length);
@@ -76,5 +78,10 @@ export class SonicForgeSDK {
   processMonoBass(channelData: Float32Array, sampleRate: number, cutoffFreq: number): Float32Array {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
+  }
+
+  processSmartLevel(channelData: Float32Array, targetLufs: number, maxGainDb: number, gateThresholdDb: number): Float32Array {
+    const { process_smartlevel } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_smartlevel(ptr, len, targetLufs, maxGainDb, gateThresholdDb));
   }
 }
