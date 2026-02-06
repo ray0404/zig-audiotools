@@ -24,7 +24,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed' | 'tapeStabilizer',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed' | 'tapeStabilizer' | 'spectralMatch',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -82,65 +82,84 @@ export async function processAudioBuffer(
         return newBuffer;
     }
 
-    for (let i = 0; i < numChannels; i++) {
-        let channelData = audioBuffer.getChannelData(i);
-        let processed: Float32Array;
+    // Spectral Match needs a reference
+    let analysisPtr = 0;
+    if (tool === 'spectralMatch' && params?.referenceBuffer) {
+        analysisPtr = sdk.spectralMatchAnalyze(params.referenceBuffer.getChannelData(0));
+    }
 
-        switch (tool) {
-            case 'declip':
-                processed = sdk.processDeclip(channelData);
-                break;
-            case 'lufs':
-                processed = sdk.processLufsNormalize(channelData, params?.targetLufs || -14);
-                break;
-            case 'phase':
-                processed = sdk.processPhaseRotation(channelData);
-                break;
-            case 'denoise':
-                processed = sdk.processSpectralDenoise(channelData);
-                break;
-            case 'monoBass':
-                // For mono tracks, it just applies filters
-                processed = sdk.processMonoBass(channelData, sampleRate, params?.cutoff || 120);
-                break;
-            case 'plosiveGuard':
-                processed = sdk.processPlosiveGuard(
-                    channelData,
-                    sampleRate,
-                    params?.sensitivity ?? 0.5,
-                    params?.strength ?? 0.5,
-                    params?.cutoff ?? 150
-                );
-                break;
-            case 'voiceIsolate':
-                processed = sdk.processVoiceIsolate(channelData, params?.amount ?? 1.0);
-                break;
-            case 'psychodynamic':
-                processed = sdk.processPsychodynamic(channelData, sampleRate, params?.intensity ?? 1.0, params?.refDb ?? -18.0);
-                break;
-            case 'smartLevel':
-                processed = sdk.processSmartLevel(
-                    channelData,
-                    params?.targetLufs || -16,
-                    params?.maxGainDb || 6,
-                    params?.gateThresholdDb || -50
-                );
-                break;
-            case 'tapeStabilizer':
-                processed = sdk.processTapeStabilizer(
-                    channelData,
-                    sampleRate,
-                    params?.nominalFreq ?? 60.0,
-                    params?.scanMin ?? 55.0,
-                    params?.scanMax ?? 65.0,
-                    params?.amount ?? 1.0
-                );
-                break;
-            default:
-                processed = new Float32Array(channelData);
+    try {
+        for (let i = 0; i < numChannels; i++) {
+            let channelData = audioBuffer.getChannelData(i);
+            let processed: Float32Array;
+
+            switch (tool) {
+                case 'declip':
+                    processed = sdk.processDeclip(channelData);
+                    break;
+                case 'lufs':
+                    processed = sdk.processLufsNormalize(channelData, params?.targetLufs || -14);
+                    break;
+                case 'phase':
+                    processed = sdk.processPhaseRotation(channelData);
+                    break;
+                case 'denoise':
+                    processed = sdk.processSpectralDenoise(channelData);
+                    break;
+                case 'monoBass':
+                    // For mono tracks, it just applies filters
+                    processed = sdk.processMonoBass(channelData, sampleRate, params?.cutoff || 120);
+                    break;
+                case 'plosiveGuard':
+                    processed = sdk.processPlosiveGuard(
+                        channelData,
+                        sampleRate,
+                        params?.sensitivity ?? 0.5,
+                        params?.strength ?? 0.5,
+                        params?.cutoff ?? 150
+                    );
+                    break;
+                case 'voiceIsolate':
+                    processed = sdk.processVoiceIsolate(channelData, params?.amount ?? 1.0);
+                    break;
+                case 'psychodynamic':
+                    processed = sdk.processPsychodynamic(channelData, sampleRate, params?.intensity ?? 1.0, params?.refDb ?? -18.0);
+                    break;
+                case 'smartLevel':
+                    processed = sdk.processSmartLevel(
+                        channelData,
+                        params?.targetLufs || -16,
+                        params?.maxGainDb || 6,
+                        params?.gateThresholdDb || -50
+                    );
+                    break;
+                case 'tapeStabilizer':
+                    processed = sdk.processTapeStabilizer(
+                        channelData,
+                        sampleRate,
+                        params?.nominalFreq ?? 60.0,
+                        params?.scanMin ?? 55.0,
+                        params?.scanMax ?? 65.0,
+                        params?.amount ?? 1.0
+                    );
+                    break;
+                case 'spectralMatch':
+                    if (analysisPtr) {
+                        processed = sdk.processSpectralMatch(channelData, analysisPtr, params?.amount ?? 1.0);
+                    } else {
+                        processed = new Float32Array(channelData);
+                    }
+                    break;
+                default:
+                    processed = new Float32Array(channelData);
+            }
+            
+            newBuffer.copyToChannel(processed as any, i);
         }
-        
-        newBuffer.copyToChannel(processed as any, i);
+    } finally {
+        if (analysisPtr) {
+            sdk.spectralMatchFree(analysisPtr);
+        }
     }
 
     return newBuffer;

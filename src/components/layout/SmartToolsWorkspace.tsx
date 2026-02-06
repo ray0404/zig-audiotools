@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { initProcessor, processAudioBuffer } from '@/services/Processor';
 import { audioBufferToWav } from '@/utils/wav-export';
@@ -5,7 +6,8 @@ import { saveAs } from 'file-saver';
 import { 
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
-    Settings2, ChevronRight, Mic, Activity, Droplets, FastForward
+    Settings2, ChevronRight, Mic, Activity, Droplets, FastForward,
+    Target
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
@@ -14,6 +16,7 @@ export const SmartToolsWorkspace: React.FC = () => {
     const [, setIsSdkReady] = useState(false);
     const [sourceBuffer, setSourceBuffer] = useState<AudioBuffer | null>(null);
     const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
+    const [referenceBuffer, setReferenceBuffer] = useState<AudioBuffer | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>('');
@@ -31,6 +34,7 @@ export const SmartToolsWorkspace: React.FC = () => {
     const animationFrameRef = useRef<number>(0);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const refInputRef = useRef<HTMLInputElement>(null);
 
     // Refs for waveform rendering
     const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -114,6 +118,21 @@ export const SmartToolsWorkspace: React.FC = () => {
             setStatus(null);
         } catch (err) {
             setStatus('Error decoding audio');
+        }
+    };
+
+    const handleRefUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !audioContextRef.current) return;
+        setStatus('Loading reference...');
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const decoded = await audioContextRef.current.decodeAudioData(arrayBuffer);
+            setReferenceBuffer(decoded);
+            setStatus('Reference loaded');
+            setTimeout(() => setStatus(null), 2000);
+        } catch (err) {
+            setStatus('Error loading reference');
         }
     };
 
@@ -296,6 +315,22 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 onClick={() => runTool('tapeStabilizer', 'Tape Fix', { nominalFreq: 60.0, amount: 1.0 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
+
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Target size={14} />}
+                                    label="Spectral Match"
+                                    onClick={() => runTool('spectralMatch', 'Match', { referenceBuffer, amount: 1.0 })}
+                                    disabled={!sourceBuffer || isProcessing || !referenceBuffer}
+                                />
+                                <button 
+                                    onClick={() => refInputRef.current?.click()}
+                                    className="w-full text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 rounded-lg border border-slate-700 transition-colors"
+                                >
+                                    {referenceBuffer ? 'Change Reference' : 'Load Reference'}
+                                </button>
+                                <input type="file" ref={refInputRef} onChange={handleRefUpload} accept="audio/*" className="hidden" />
+                            </div>
 
                             {/* Plosive Guard */}
                             <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">

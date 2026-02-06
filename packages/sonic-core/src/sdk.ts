@@ -148,4 +148,26 @@ export class SonicForgeSDK {
       process_tapestabilizer(ptr, len, sampleRate, nominalFreq, scanMin, scanMax, amount)
     );
   }
+
+  spectralMatchAnalyze(channelData: Float32Array): number {
+    if (!this.wasmInstance || !this.memory) throw new Error('SDK not initialized');
+    const { alloc, free, spectralmatch_analyze_ref } = this.wasmInstance.exports as any;
+    const ptr = alloc(channelData.length);
+    try {
+      new Float32Array(this.memory.buffer, ptr, channelData.length).set(channelData);
+      return spectralmatch_analyze_ref(ptr, channelData.length);
+    } finally {
+      free(ptr, channelData.length);
+    }
+  }
+
+  spectralMatchFree(analysisPtr: number): void {
+    const { spectralmatch_free_analysis } = this.wasmInstance!.exports as any;
+    spectralmatch_free_analysis(analysisPtr);
+  }
+
+  processSpectralMatch(channelData: Float32Array, analysisPtr: number, amount: number): Float32Array {
+    const { process_spectralmatch } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_spectralmatch(ptr, len, analysisPtr, amount, 0.5));
+  }
 }

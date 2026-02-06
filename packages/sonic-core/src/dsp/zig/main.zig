@@ -4,6 +4,11 @@ const plosive = @import("plosiveguard.zig");
 const voice_isolate = @import("voice_isolate.zig");
 const debleed = @import("debleed.zig");
 const stabilizer = @import("tape_stabilizer.zig");
+const spectralmatch = @import("spectralmatch.zig");
+
+comptime {
+    _ = spectralmatch;
+}
 
 // Import SmartLevel module to ensure its exported functions are included
 pub usingnamespace @import("smart_level.zig");
