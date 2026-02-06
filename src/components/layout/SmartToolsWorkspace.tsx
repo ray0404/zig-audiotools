@@ -259,6 +259,12 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
+                            <ToolButton
+                                icon={<Wand2 size={14} />}
+                                label="DeBleed Lite"
+                                onClick={() => runTool('debleed', 'DeBleed Lite', { sensitivity: 0.5, threshold: -40 })}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
                         </div>
                     </section>
 
