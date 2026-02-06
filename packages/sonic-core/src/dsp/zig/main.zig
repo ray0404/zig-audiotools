@@ -1,5 +1,6 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
+const voice_isolate = @import("voice_isolate.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -376,4 +377,9 @@ export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32
         data[i] = low_mono + high_l;
         data[i+1] = low_mono + high_r;
     }
+}
+
+// --- 6. Voice Isolate ---
+export fn process_voiceisolate(ptr: [*]f32, len: usize, amount: f32) void {
+    voice_isolate.process_voiceisolate(ptr, len, amount);
 }
