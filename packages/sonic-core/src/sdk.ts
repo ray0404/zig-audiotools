@@ -77,4 +77,9 @@ export class SonicForgeSDK {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
   }
+
+  processPsychodynamic(channelData: Float32Array, sampleRate: number, intensity: number, refDb: number): Float32Array {
+    const { process_psychodynamic } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_psychodynamic(ptr, len, sampleRate, intensity, refDb));
+  }
 }

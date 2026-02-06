@@ -377,3 +377,174 @@ export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32
         data[i+1] = low_mono + high_r;
     }
 }
+
+// --- 6. PsychoDynamic EQ ---
+
+fn calc_low_shelf_coeffs(fc: f32, sample_rate: f32, gain_db: f32) Biquad {
+    const A = std.math.pow(f32, 10.0, gain_db / 40.0);
+    const w0 = math.TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / 2.0 * std.math.sqrt(2.0); // Q = 0.707
+
+    const temp1 = 2.0 * std.math.sqrt(A) * alpha;
+    const ap1 = A + 1.0;
+    const am1 = A - 1.0;
+
+    const b0 = A * (ap1 - am1 * cos_w0 + temp1);
+    const b1 = 2.0 * A * (am1 - ap1 * cos_w0);
+    const b2 = A * (ap1 - am1 * cos_w0 - temp1);
+    const a0 = ap1 + am1 * cos_w0 + temp1;
+    const a1 = -2.0 * (am1 + ap1 * cos_w0);
+    const a2 = ap1 + am1 * cos_w0 - temp1;
+
+    return .{
+        .b0 = b0 / a0,
+        .b1 = b1 / a0,
+        .b2 = b2 / a0,
+        .a1 = a1 / a0,
+        .a2 = a2 / a0,
+    };
+}
+
+fn calc_high_shelf_coeffs(fc: f32, sample_rate: f32, gain_db: f32) Biquad {
+    const A = std.math.pow(f32, 10.0, gain_db / 40.0);
+    const w0 = math.TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / 2.0 * std.math.sqrt(2.0);
+
+    const temp1 = 2.0 * std.math.sqrt(A) * alpha;
+    const ap1 = A + 1.0;
+    const am1 = A - 1.0;
+
+    const b0 = A * (ap1 + am1 * cos_w0 + temp1);
+    const b1 = -2.0 * A * (am1 + ap1 * cos_w0);
+    const b2 = A * (ap1 + am1 * cos_w0 - temp1);
+    const a0 = ap1 - am1 * cos_w0 + temp1;
+    const a1 = 2.0 * (am1 - ap1 * cos_w0);
+    const a2 = ap1 - am1 * cos_w0 - temp1;
+
+    return .{
+        .b0 = b0 / a0,
+        .b1 = b1 / a0,
+        .b2 = b2 / a0,
+        .a1 = a1 / a0,
+        .a2 = a2 / a0,
+    };
+}
+
+fn calc_peaking_coeffs(fc: f32, sample_rate: f32, gain_db: f32, Q: f32) Biquad {
+    const A = std.math.pow(f32, 10.0, gain_db / 40.0);
+    const w0 = math.TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / (2.0 * Q);
+
+    const b0 = 1.0 + alpha * A;
+    const b1 = -2.0 * cos_w0;
+    const b2 = 1.0 - alpha * A;
+    const a0 = 1.0 + alpha / A;
+    const a1 = -2.0 * cos_w0;
+    const a2 = 1.0 - alpha / A;
+
+    return .{
+        .b0 = b0 / a0,
+        .b1 = b1 / a0,
+        .b2 = b2 / a0,
+        .a1 = a1 / a0,
+        .a2 = a2 / a0,
+    };
+}
+
+export fn process_psychodynamic(
+    ptr: [*]f32,
+    len: usize,
+    sample_rate: f32,
+    intensity: f32,
+    ref_db: f32
+) void {
+    const data = ptr[0..len];
+
+    // Filter states
+    var low_shelf = calc_low_shelf_coeffs(100.0, sample_rate, 0.0);
+    var mid_bell = calc_peaking_coeffs(2500.0, sample_rate, 0.0, 1.0);
+    var high_shelf = calc_high_shelf_coeffs(10000.0, sample_rate, 0.0);
+
+    // Dynamic state
+    var rms_energy: f32 = 0.0;
+    const attack_ms: f32 = 100.0;
+    const release_ms: f32 = 500.0;
+
+    // Simple 1-pole coeff for envelope
+    // t = 1 - exp(-1 / (time * fs))
+    const att_coeff = 1.0 - std.math.exp(-1.0 / (attack_ms * 0.001 * sample_rate));
+    const rel_coeff = 1.0 - std.math.exp(-1.0 / (release_ms * 0.001 * sample_rate));
+
+    const block_size = 64;
+    var i: usize = 0;
+
+    while (i < len) {
+        // Calculate block size for this iteration
+        const current_block_size = @min(block_size, len - i);
+
+        // 1. Calculate RMS for this block to estimate loudness
+        // (Or we can run the envelope follower sample by sample, which is smoother)
+        // Let's run a simple squared envelope follower sample by sample for accurate deficit,
+        // but update coeffs only once per block.
+
+        // For the gain calculation, we use the RMS of the PREVIOUS block or current smoothed value.
+        // Let's use the current smoothed energy.
+
+        // Convert smoothed energy to dB
+        const current_db = math.linearToDb(std.math.sqrt(rms_energy));
+        var deficit = ref_db - current_db;
+
+        // Intensity scaling
+        deficit *= intensity;
+
+        // Clamp deficit to reasonable bounds (e.g. +/- 20dB) to prevent explosion
+        if (deficit > 20.0) deficit = 20.0;
+        if (deficit < -20.0) deficit = -20.0;
+
+        // Calculate gains
+        const gain_low = deficit * 0.4;
+        const gain_high = deficit * 0.2;
+        const gain_mid = -deficit * 0.1;
+
+        // Update filters
+        // Preserve state (x1, x2, y1, y2)
+        const ls_state = .{ .x1 = low_shelf.x1, .x2 = low_shelf.x2, .y1 = low_shelf.y1, .y2 = low_shelf.y2 };
+        low_shelf = calc_low_shelf_coeffs(100.0, sample_rate, gain_low);
+        low_shelf.x1 = ls_state.x1; low_shelf.x2 = ls_state.x2; low_shelf.y1 = ls_state.y1; low_shelf.y2 = ls_state.y2;
+
+        const mb_state = .{ .x1 = mid_bell.x1, .x2 = mid_bell.x2, .y1 = mid_bell.y1, .y2 = mid_bell.y2 };
+        mid_bell = calc_peaking_coeffs(2500.0, sample_rate, gain_mid, 1.0);
+        mid_bell.x1 = mb_state.x1; mid_bell.x2 = mb_state.x2; mid_bell.y1 = mb_state.y1; mid_bell.y2 = mb_state.y2;
+
+        const hs_state = .{ .x1 = high_shelf.x1, .x2 = high_shelf.x2, .y1 = high_shelf.y1, .y2 = high_shelf.y2 };
+        high_shelf = calc_high_shelf_coeffs(10000.0, sample_rate, gain_high);
+        high_shelf.x1 = hs_state.x1; high_shelf.x2 = hs_state.x2; high_shelf.y1 = hs_state.y1; high_shelf.y2 = hs_state.y2;
+
+        // Process block
+        var j: usize = 0;
+        while (j < current_block_size) : (j += 1) {
+            var sample = data[i + j];
+            const sq = sample * sample;
+
+            // Update envelope
+            // If signal is higher than envelope, use attack, else release
+            const coeff = if (sq > rms_energy) att_coeff else rel_coeff;
+            rms_energy = rms_energy + coeff * (sq - rms_energy);
+
+            // Prevent underflow
+            if (rms_energy < 0.0000001) rms_energy = 0.0000001;
+
+            // Apply filters in series
+            sample = low_shelf.process(sample);
+            sample = mid_bell.process(sample);
+            sample = high_shelf.process(sample);
+
+            data[i + j] = sample;
+        }
+
+        i += current_block_size;
+    }
+}

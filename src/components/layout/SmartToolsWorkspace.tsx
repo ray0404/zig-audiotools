@@ -259,6 +259,12 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
+                            <ToolButton
+                                icon={<Wand2 size={14} />}
+                                label="PsychoDynamic EQ"
+                                onClick={() => runTool('psychodynamic', 'PsychoDynamic EQ', { intensity: 1.0, refDb: -18.0 })}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
                         </div>
                     </section>
 
