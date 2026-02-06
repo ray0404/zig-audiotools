@@ -77,4 +77,33 @@ export class SonicForgeSDK {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
   }
+
+  processDebleed(target: Float32Array, source: Float32Array, sensitivity: number, threshold: number): Float32Array {
+    if (!this.wasmInstance || !this.memory) {
+      throw new Error('SDK not initialized. Call init() first.');
+    }
+    const { alloc, free, process_debleed } = this.wasmInstance.exports as any;
+
+    const len = target.length;
+    if (source.length !== len) throw new Error('Target and Source length mismatch');
+
+    const ptrTarget = alloc(len);
+    const ptrSource = alloc(len);
+
+    try {
+      // Copy inputs
+      // Note: We create views immediately before use to avoid detachment issues if alloc triggers growth
+      new Float32Array(this.memory.buffer, ptrTarget, len).set(target);
+      new Float32Array(this.memory.buffer, ptrSource, len).set(source);
+
+      process_debleed(ptrTarget, ptrSource, len, sensitivity, threshold);
+
+      // Read back result (target buffer is modified in place)
+      // Must recreate view as memory might have grown
+      return new Float32Array(new Float32Array(this.memory.buffer, ptrTarget, len));
+    } finally {
+      free(ptrTarget, len);
+      free(ptrSource, len);
+    }
+  }
 }

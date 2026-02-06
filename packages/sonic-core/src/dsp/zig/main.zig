@@ -1,5 +1,6 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
+const debleed = @import("debleed.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -376,4 +377,15 @@ export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32
         data[i] = low_mono + high_l;
         data[i+1] = low_mono + high_r;
     }
+}
+
+// --- 6. DeBleed Lite ---
+
+export fn process_debleed(ptr_target: [*]f32, ptr_source: [*]f32, len: usize, sensitivity: f32, threshold: f32) void {
+    const target = ptr_target[0..len];
+    const source = ptr_source[0..len];
+    debleed.process(allocator, target, source, sensitivity, threshold) catch |err| {
+        // Ignore allocation errors for now in WASM context (or log if possible)
+        _ = err;
+    };
 }
