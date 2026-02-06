@@ -170,4 +170,9 @@ export class SonicForgeSDK {
     const { process_spectralmatch } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_spectralmatch(ptr, len, analysisPtr, amount, 0.5));
   }
+
+  processEchoVanish(channelData: Float32Array, sampleRate: number, amount: number, tailMs: number): Float32Array {
+    const { process_echovanish } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_echovanish(ptr, len, sampleRate, amount, tailMs));
+  }
 }

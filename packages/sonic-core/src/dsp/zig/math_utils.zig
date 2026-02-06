@@ -21,6 +21,18 @@ pub const Complex = struct {
             .im = self.re * other.im + self.im * other.re,
         };
     }
+
+    pub fn div(self: Complex, other: Complex) Complex {
+        const denom = other.re * other.re + other.im * other.im;
+        return .{
+            .re = (self.re * other.re + self.im * other.im) / denom,
+            .im = (self.im * other.re - self.re * other.im) / denom,
+        };
+    }
+
+    pub fn conjugate(self: Complex) Complex {
+        return .{ .re = self.re, .im = -self.im };
+    }
     
     pub fn magnitude(self: Complex) f32 {
         return std.math.sqrt(self.re * self.re + self.im * self.im);

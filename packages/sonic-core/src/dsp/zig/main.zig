@@ -5,6 +5,7 @@ const voice_isolate = @import("voice_isolate.zig");
 const debleed = @import("debleed.zig");
 const stabilizer = @import("tape_stabilizer.zig");
 const spectralmatch = @import("spectralmatch.zig");
+const echovanish = @import("echovanish.zig");
 
 comptime {
     _ = spectralmatch;
@@ -480,4 +481,10 @@ export fn process_tapestabilizer(
     correction_amount: f32
 ) void {
     stabilizer.process_tapestabilizer(ptr, len, sample_rate, nominal_freq, scan_freq_min, scan_freq_max, correction_amount);
+}
+
+// --- 11. Echo Vanish (De-Reverb) ---
+
+export fn process_echovanish(ptr: [*]f32, len: usize, sample_rate: f32, reduction_amount: f32, tail_length_ms: f32) void {
+    echovanish.process_echovanish(ptr, len, sample_rate, reduction_amount, tail_length_ms);
 }

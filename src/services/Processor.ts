@@ -24,7 +24,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed' | 'tapeStabilizer' | 'spectralMatch',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed' | 'tapeStabilizer' | 'spectralMatch' | 'echovanish',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -149,6 +149,9 @@ export async function processAudioBuffer(
                     } else {
                         processed = new Float32Array(channelData);
                     }
+                    break;
+                case 'echovanish':
+                    processed = sdk.processEchoVanish(channelData, sampleRate, params?.amount ?? 1.0, params?.tailMs ?? 100);
                     break;
                 default:
                     processed = new Float32Array(channelData);

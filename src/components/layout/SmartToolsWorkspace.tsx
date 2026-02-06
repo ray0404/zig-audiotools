@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { initProcessor, processAudioBuffer } from '@/services/Processor';
 import { audioBufferToWav } from '@/utils/wav-export';
@@ -7,7 +6,7 @@ import {
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
     Settings2, ChevronRight, Mic, Activity, Droplets, FastForward,
-    Target
+    Target, Wind
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
@@ -331,6 +330,13 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 </button>
                                 <input type="file" ref={refInputRef} onChange={handleRefUpload} accept="audio/*" className="hidden" />
                             </div>
+
+                            <ToolButton
+                                icon={<Wind size={14} />}
+                                label="Echo Vanish"
+                                onClick={() => runTool('echovanish', 'De-Reverb', { amount: 1.0, tailMs: 100 })}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
 
                             {/* Plosive Guard */}
                             <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
