@@ -94,4 +94,9 @@ export class SonicForgeSDK {
     const { process_voiceisolate } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_voiceisolate(ptr, len, amount));
   }
+
+  processPsychodynamic(channelData: Float32Array, sampleRate: number, intensity: number, refDb: number): Float32Array {
+    const { process_psychodynamic } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_psychodynamic(ptr, len, sampleRate, intensity, refDb));
+  }
 }

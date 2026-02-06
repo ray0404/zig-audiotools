@@ -155,3 +155,77 @@ pub fn calc_hpf_coeffs(fc: f32, sample_rate: f32) Biquad {
         .a2 = (1 - alpha) / a0,
     };
 }
+
+pub fn calc_low_shelf_coeffs(fc: f32, sample_rate: f32, gain_db: f32) Biquad {
+    const A = std.math.pow(f32, 10.0, gain_db / 40.0);
+    const w0 = TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / 2.0 * std.math.sqrt(2.0); // Q = 0.707
+
+    const temp1 = 2.0 * std.math.sqrt(A) * alpha;
+    const ap1 = A + 1.0;
+    const am1 = A - 1.0;
+
+    const b0 = A * (ap1 - am1 * cos_w0 + temp1);
+    const b1 = 2.0 * A * (am1 - ap1 * cos_w0);
+    const b2 = A * (ap1 - am1 * cos_w0 - temp1);
+    const a0 = ap1 + am1 * cos_w0 + temp1;
+    const a1 = -2.0 * (am1 + ap1 * cos_w0);
+    const a2 = ap1 + am1 * cos_w0 - temp1;
+
+    return .{
+        .b0 = b0 / a0,
+        .b1 = b1 / a0,
+        .b2 = b2 / a0,
+        .a1 = a1 / a0,
+        .a2 = a2 / a0,
+    };
+}
+
+pub fn calc_high_shelf_coeffs(fc: f32, sample_rate: f32, gain_db: f32) Biquad {
+    const A = std.math.pow(f32, 10.0, gain_db / 40.0);
+    const w0 = TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / 2.0 * std.math.sqrt(2.0);
+
+    const temp1 = 2.0 * std.math.sqrt(A) * alpha;
+    const ap1 = A + 1.0;
+    const am1 = A - 1.0;
+
+    const b0 = A * (ap1 + am1 * cos_w0 + temp1);
+    const b1 = -2.0 * A * (am1 + ap1 * cos_w0);
+    const b2 = A * (ap1 + am1 * cos_w0 - temp1);
+    const a0 = ap1 - am1 * cos_w0 + temp1;
+    const a1 = 2.0 * (am1 - ap1 * cos_w0);
+    const a2 = ap1 - am1 * cos_w0 - temp1;
+
+    return .{
+        .b0 = b0 / a0,
+        .b1 = b1 / a0,
+        .b2 = b2 / a0,
+        .a1 = a1 / a0,
+        .a2 = a2 / a0,
+    };
+}
+
+pub fn calc_peaking_coeffs(fc: f32, sample_rate: f32, gain_db: f32, Q: f32) Biquad {
+    const A = std.math.pow(f32, 10.0, gain_db / 40.0);
+    const w0 = TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / (2.0 * Q);
+
+    const b0 = 1.0 + alpha * A;
+    const b1 = -2.0 * cos_w0;
+    const b2 = 1.0 - alpha * A;
+    const a0 = 1.0 + alpha / A;
+    const a1 = -2.0 * cos_w0;
+    const a2 = 1.0 - alpha / A;
+
+    return .{
+        .b0 = b0 / a0,
+        .b1 = b1 / a0,
+        .b2 = b2 / a0,
+        .a1 = a1 / a0,
+        .a2 = a2 / a0,
+    };
+}

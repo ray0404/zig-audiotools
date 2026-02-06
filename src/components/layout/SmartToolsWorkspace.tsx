@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { initProcessor, processAudioBuffer } from '@/services/Processor';
 import { audioBufferToWav } from '@/utils/wav-export';
@@ -230,7 +231,7 @@ export const SmartToolsWorkspace: React.FC = () => {
                 <aside className="w-72 border-r border-slate-800 bg-slate-900/30 p-4 flex flex-col gap-6">
                     <section>
                         <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Processors</h2>
-                        <div className="space-y-2">
+                        <div className="space-y-2 overflow-y-auto pr-2 max-h-[calc(100vh-250px)]">
                             <ToolButton 
                                 icon={<Settings2 size={14} />} 
                                 label="Loudness Normalize" 
@@ -266,6 +267,13 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 icon={<Mic size={14} />}
                                 label="Voice Isolate"
                                 onClick={() => runTool('voiceIsolate', 'Voice Isolate', { amount: 1.0 })}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
+
+                            <ToolButton
+                                icon={<Wand2 size={14} />}
+                                label="PsychoDynamic EQ"
+                                onClick={() => runTool('psychodynamic', 'PsychoDynamic EQ', { intensity: 1.0, refDb: -18.0 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
 
