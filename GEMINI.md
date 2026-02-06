@@ -2,86 +2,70 @@
 
 ## 1. Project Overview
 
-**SonicPress** is a high-performance, specialized **Audio DSP Utility** and library, born from a refactoring of the original SonicForge DAW. It transitions from a multi-track creative environment to a precision-focused mastering and restoration suite centered around "Smart Tools."
-
-These tools leverage **Zig** for high-performance DSP, compiled to **WebAssembly (WASM)**, providing near-native processing speeds directly in the browser or terminal.
+**SonicPress** is a professional-grade **Audio DSP Utility** and library, born from a strategic refactoring of the original SonicForge DAW. It transitions from a creative multi-track environment to a specialized workbench for high-performance mastering and restoration.
 
 ### Core Philosophy
-*   **Performance:** CPU-intensive tasks (FFT, Spline Interpolation, SIMD) are handled by Zig/WASM.
-*   **Specialization:** Focuses on high-value mastering and restoration (De-clipping, LUFS Normalization, Spectral Denoising).
-*   **A/B Precision:** Isolated buffer management for instant auditing of processed results vs. original source.
-*   **Hybrid Native/Web:** A single core logic package (`@sonic-core`) that powers a React PWA, a headless browser-driven CLI, and a future native Node.js bridge.
+*   **Performance:** All heavy mathematical lifting (FFT, Matrix Inversion, Resampling) is offloaded to **Zig**, compiled to **WebAssembly (WASM)**.
+*   **A/B Precision:** The system is built around instant auditing, maintaining distinct memory buffers for the original source and the processed result.
+*   **Hybrid Orchestration:** A single core logic package (`@sonic-core`) powers a React PWA, a headless terminal interface (TUI), and batch-processing automation.
 
-## 2. Architecture
+## 2. Three-Layer Architecture
 
-SonicPress follows a **Three-Layer Architecture** designed to respect thread boundaries and bridge high-level state with low-level WASM memory.
+SonicPress follows a strict separation of concerns to respect thread boundaries and bridge high-level state with low-level memory.
 
 ### Layer 1: Intent Layer (UI & State)
-*   **Context:** Main Thread.
-*   **Technology:** React 18, Tailwind CSS, Lucide Icons.
-*   **Role:** Captures user intent and visualizes audio state.
-*   **Key Files:**
-    *   `src/components/layout/SmartToolsWorkspace.tsx`: The primary dashboard for audio processing and A/B comparison.
-    *   `src/components/visualizers/ResponsiveCanvas.tsx`: High-performance waveform rendering with automatic resizing and DPI support.
+*   **Context:** Browser Main Thread.
+*   **Technology:** React 18, Tailwind CSS, Lucide Icons, Zustand.
+*   **Role:** Captures user parameters (thresholds, sensitivities, frequency cutoffs) and visualizes waveform state.
+*   **Key File:** `src/components/layout/SmartToolsWorkspace.tsx`.
 
 ### Layer 2: Orchestration Layer (Engine & SDK)
 *   **Context:** Main Thread / Web Workers.
-*   **Technology:** TypeScript, `@sonic-core`.
-*   **Role:** Manages audio buffer lifecycles, WASM memory allocation, and the execution pipeline.
-*   **Key Files:**
-    *   `packages/sonic-core/src/sdk.ts`: The TypeScript bridge handling `alloc` -> `memcpy` -> `process` -> `free` workflows with WASM.
-    *   `src/services/Processor.ts`: coordinates channel-by-channel processing and interleaving for stereo tools.
-    *   `packages/sonic-core/src/mixer.ts`: Legacy engine preserved for future tool-chaining and complex routing.
+*   **Technology:** TypeScript, `@sonic-core/sdk.ts`.
+*   **Role:** Manages the life-cycle of WASM memory. It handles the `alloc` -> `memcpy` -> `execute` -> `read` -> `free` workflow.
+*   **Cross-Channel Handling:** coordinates tools that require stereo awareness (e.g., Mono Bass, DeBleed) by interleaving channels or passing dual pointers to WASM.
+*   **Key File:** `src/services/Processor.ts`.
 
-### Layer 3: Processing Layer (DSP)
+### Layer 3: Processing Layer (DSP Core)
 *   **Context:** WASM Linear Memory / AudioWorklet Thread.
-*   **Technology:** Zig 0.13.0, AudioWorklet (JS).
-*   **Role:** Performs mathematical manipulation of audio samples.
-*   **Key Files:**
-    *   `packages/sonic-core/src/dsp/zig/main.zig`: The source of all Smart Tools.
-    *   `packages/sonic-core/src/worklets/`: Real-time processors for metering and basic effects.
+*   **Technology:** Zig 0.13.0.
+*   **Role:** Freestanding mathematical manipulation of audio samples.
+*   **Key File:** `packages/sonic-core/src/dsp/zig/main.zig` (The primary compilation entry point).
 
 ## 3. Technology Stack
 
-*   **Frontend:** React 18, Vite 5.
-*   **Language:** TypeScript 5.x, Zig 0.13.0.
-*   **State Management:** Zustand (TUI and Engine sync).
-*   **Audio API:** Web Audio API via `standardized-audio-context`.
-*   **CLI Infrastructure:** Ink (React-based TUI), Puppeteer (Headless Bridge).
-*   **Persistence:** `idb-keyval` (IndexedDB) for local audio and project persistence.
+*   **Frontend:** React 18 with Vite 5.
+*   **DSP Core:** Zig 0.13.0 targeting `wasm32-freestanding`.
+*   **Audio Pipeline:** Web Audio API via `standardized-audio-context`.
+*   **CLI Infrastructure:** Ink (React-based terminal UI) and Puppeteer (Headless bridge).
+*   **Storage:** `idb-keyval` for persistent local project and audio state.
 
 ## 4. Smart Processing Library (Zig/WASM)
 
-Current professional-grade processors implemented in Zig:
+The following professional-grade modules are currently integrated:
 
-1.  **Loudness Normalization:** RMS-based normalization with K-weighting approximation to target specific LUFS levels.
-2.  **Phase Rotation:** Chain of all-pass filters designed to reduce peak amplitude and recover headroom.
-3.  **De-Clipper:** Restoration of clipped peaks using **Cubic Hermite Spline (Catmull-Rom)** interpolation.
-4.  **Adaptive Spectral Denoise:** STFT-based noise reduction using spectral subtraction.
-5.  **Mono Bass:** Linkwitz-Riley 4th order crossover summing frequencies below a cutoff (e.g., 120Hz) to mono.
+1.  **Plosive Guard:** Adaptive suppression of vocal pops. Uses 4th-order crossovers and flux-based rise detection to clamp down on explosive low-frequency energy.
+2.  **Voice Isolate:** Spectral gating denoiser. Extracts Bark-scale energy features to infer a speech mask, effectively separating voice from noise.
+3.  **PsychoDynamic EQ:** Dynamic tonal balance correction based on ISO 226 (Fletcher-Munson) equal-loudness contours. Automatically adjusts low and high shelves based on perceived volume.
+4.  **Smart Level:** Intelligent gain management. Features a 300ms sliding window RMS detector with inertia-based smoothing to prevent pumping while maintaining target LUFS.
+5.  **DeBleed Lite:** specialized dual-channel spill removal. Uses spectral subtraction between a target and a source (bleed reference) channel.
+6.  **Tape Stabilizer:** Correction of mechanical pitch fluctuations (wow/flutter). Leverages the YIN algorithm for sub-sample pitch detection and high-precision Cubic Hermite Spline resampling.
+7.  **Spectral Match:** High-precision frequency matching. Analyzes a reference profile and applies its fingerprint to a target using linear-phase convolution (overlap-add with 8192 FFT).
+8.  **Echo Vanish:** Advanced dereverberation. Implements the Weighted Prediction Error (WPE) algorithm, using Gaussian elimination to solve for optimal reflection cancellation filters.
+9.  **Loudness Normalization:** Standard-compliant gain adjustment (-14 to -23 LUFS) using K-weighted approximations.
+10. **De-Clipper:** Restoration of digital clipping using Catmull-Rom spline interpolation between surviving samples.
+11. **Phase Rotation:** Chain of all-pass filters designed to smooth transients and recover digital headroom.
+12. **Mono Bass:** Linkwitz-Riley crossover utility that sums frequencies below a user-defined cutoff to mono.
 
-## 5. Development Conventions
+## 5. Shared Math Utilities (`math_utils.zig`)
 
-### The "A/B Buffer Pattern"
-In `SmartToolsWorkspace`, we maintain two distinct `AudioBuffer` objects:
-*   `sourceBuffer`: The immutable original file.
-*   `processedBuffer`: A cloned buffer destructively modified by tools.
-This ensures that switching between "Source" and "Processed" is instantaneous and consistent.
+To ensure consistency and performance across all tools, the following primitives are centralized:
+*   **FFT:** Iterative Cooley-Tukey implementation for spectral analysis and synthesis.
+*   **Biquad:** Standard Transposed Direct Form II implementation for LPF, HPF, and Shelving filters.
+*   **Complex Math:** Full suite of complex addition, subtraction, multiplication, and conjugate operations required for WPE and FFT.
+*   **Interpolation:** High-fidelity Cubic Hermite and Catmull-Rom interpolators for resampling and restoration.
+*   **Matrix Solver:** Partial pivoting Gaussian elimination solver for linear systems (used in Echo Vanish).
 
-### Stereo Handling
-Zig DSP functions typically operate on a single memory pointer. Tools that are channel-agnostic are run per-channel. Tools that require channel interaction (like `monoBass`) require the JS/TS service to interleave the channels before processing and de-interleave them after.
+## 6. Development & Verification
 
-## 6. CLI & Headless Bridge
-
-SonicPress includes a CLI (`cli/index.ts`) that runs the engine in a headless environment.
-*   **Headless Mode:** Launches Chromium via Puppeteer to access browser-only APIs like `decodeAudioData` and AudioWorklets.
-*   **Native Mode (In-Progress):** A `NativeEngine` implementation intended to run purely in Node.js for algorithmic tasks.
-*   **TUI:** A full-featured terminal UI built with Ink, allowing remote management of the DSP rack.
-
-## 7. Future Roadmap
-
-1.  **Tool Chaining:** Re-integrating the `MixerEngine` rack system into the Smart Tools UI to allow non-destructive tool chains.
-2.  **Pure Native CLI:** Finishing the `NativeEngine` to remove the Chromium dependency for batch processing.
-3.  **Visual Node Graph:** A node-based UI for complex audio routing and processing chains.
-4.  **Expanded Restoration Suite:** Zig-based De-Esser, Transient Shaper, and Multiband Comp.
-5.  **Programmatic SDK:** Publishing `@sonic-core` as a standalone npm package for third-party audio apps.
+The project includes Python-based Playwright scripts (`verification/`) to automate the UI auditing of new DSP modules, ensuring that controls are correctly mapped and visualizers are responding to processed signals.
