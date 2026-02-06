@@ -1,4 +1,3 @@
-
 export class SonicForgeSDK {
   private wasmInstance: WebAssembly.Instance | null = null;
   private memory: WebAssembly.Memory | null = null;
@@ -89,5 +88,10 @@ export class SonicForgeSDK {
     return this.processBuffer(channelData, (ptr, len) =>
       process_plosiveguard(ptr, len, sampleRate, sensitivity, strength, cutoff)
     );
+  }
+
+  processVoiceIsolate(channelData: Float32Array, amount: number): Float32Array {
+    const { process_voiceisolate } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_voiceisolate(ptr, len, amount));
   }
 }

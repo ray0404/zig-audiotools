@@ -1,6 +1,7 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
 const plosive = @import("plosiveguard.zig");
+const voice_isolate = @import("voice_isolate.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -342,4 +343,9 @@ export fn process_plosiveguard(
     cutoff: f32
 ) void {
     plosive.process_plosiveguard(ptr, len, sample_rate, sensitivity, strength, cutoff);
+}
+
+// --- 7. Voice Isolate ---
+export fn process_voiceisolate(ptr: [*]f32, len: usize, amount: f32) void {
+    voice_isolate.process_voiceisolate(ptr, len, amount);
 }

@@ -1,4 +1,3 @@
-
 import { SonicForgeSDK } from '@sonic-core/sdk.js';
 
 let sdk: SonicForgeSDK | null = null;
@@ -25,7 +24,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -92,6 +91,9 @@ export async function processAudioBuffer(
                     params?.strength ?? 0.5,
                     params?.cutoff ?? 150
                 );
+                break;
+            case 'voiceIsolate':
+                processed = sdk.processVoiceIsolate(channelData, params?.amount ?? 1.0);
                 break;
             default:
                 processed = new Float32Array(channelData);
