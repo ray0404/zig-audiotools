@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { initProcessor, processAudioBuffer } from '@/services/Processor';
 import { audioBufferToWav } from '@/utils/wav-export';
@@ -6,7 +5,7 @@ import { saveAs } from 'file-saver';
 import { 
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
-    Settings2, ChevronRight, Mic
+    Settings2, ChevronRight, Mic, Activity
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
@@ -274,6 +273,13 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 icon={<Wand2 size={14} />}
                                 label="PsychoDynamic EQ"
                                 onClick={() => runTool('psychodynamic', 'PsychoDynamic EQ', { intensity: 1.0, refDb: -18.0 })}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
+
+                            <ToolButton
+                                icon={<Activity size={14} />}
+                                label="Smart Level"
+                                onClick={() => runTool('smartLevel', 'Smart Level', { targetLufs: -16, maxGainDb: 6 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
 

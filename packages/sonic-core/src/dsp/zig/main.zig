@@ -3,6 +3,9 @@ const math = @import("math_utils.zig");
 const plosive = @import("plosiveguard.zig");
 const voice_isolate = @import("voice_isolate.zig");
 
+// Import SmartLevel module to ensure its exported functions are included
+pub usingnamespace @import("smart_level.zig");
+
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 

@@ -24,7 +24,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -97,6 +97,14 @@ export async function processAudioBuffer(
                 break;
             case 'psychodynamic':
                 processed = sdk.processPsychodynamic(channelData, sampleRate, params?.intensity ?? 1.0, params?.refDb ?? -18.0);
+                break;
+            case 'smartLevel':
+                processed = sdk.processSmartLevel(
+                    channelData,
+                    params?.targetLufs || -16,
+                    params?.maxGainDb || 6,
+                    params?.gateThresholdDb || -50
+                );
                 break;
             default:
                 processed = new Float32Array(channelData);
