@@ -77,4 +77,9 @@ export class SonicForgeSDK {
     const { process_mono_bass } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_mono_bass(ptr, len, sampleRate, cutoffFreq));
   }
+
+  processEchoVanish(channelData: Float32Array, sampleRate: number, reductionAmount: number, tailLengthMs: number): Float32Array {
+    const { process_echovanish } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) => process_echovanish(ptr, len, sampleRate, reductionAmount, tailLengthMs));
+  }
 }

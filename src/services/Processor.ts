@@ -25,7 +25,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'echoVanish',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -83,6 +83,9 @@ export async function processAudioBuffer(
             case 'monoBass':
                 // For mono tracks, it just applies filters
                 processed = sdk.processMonoBass(channelData, sampleRate, params?.cutoff || 120);
+                break;
+            case 'echoVanish':
+                processed = sdk.processEchoVanish(channelData, sampleRate, params?.reduction ?? 0.5, params?.tailLength ?? 100);
                 break;
             default:
                 processed = new Float32Array(channelData);
