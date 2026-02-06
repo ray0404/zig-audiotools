@@ -23,9 +23,20 @@ export function getProcessorSDK() {
 /**
  * High-level browser utility to process an AudioBuffer channel-by-channel.
  */
+export function captureSpectralReference(audioBuffer: AudioBuffer): number {
+    const sdk = getProcessorSDK();
+    // Use first channel for reference analysis
+    return sdk.analyzeReference(audioBuffer.getChannelData(0));
+}
+
+export function freeSpectralReference(ptr: number) {
+    const sdk = getProcessorSDK();
+    sdk.freeAnalysis(ptr);
+}
+
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'spectralMatch',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -83,6 +94,18 @@ export async function processAudioBuffer(
             case 'monoBass':
                 // For mono tracks, it just applies filters
                 processed = sdk.processMonoBass(channelData, sampleRate, params?.cutoff || 120);
+                break;
+            case 'spectralMatch':
+                if (params?.refPtr) {
+                    processed = sdk.processSpectralMatch(
+                        channelData,
+                        params.refPtr,
+                        params.amount ?? 1.0,
+                        params.smooth ?? 0.0
+                    );
+                } else {
+                    processed = new Float32Array(channelData);
+                }
                 break;
             default:
                 processed = new Float32Array(channelData);

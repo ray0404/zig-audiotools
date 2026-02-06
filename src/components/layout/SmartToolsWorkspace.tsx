@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { initProcessor, processAudioBuffer } from '@/services/Processor';
+import { initProcessor, processAudioBuffer, captureSpectralReference, freeSpectralReference } from '@/services/Processor';
 import { audioBufferToWav } from '@/utils/wav-export';
 import { saveAs } from 'file-saver';
 import { 
@@ -18,6 +18,24 @@ export const SmartToolsWorkspace: React.FC = () => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>('');
+    const [referencePtr, setReferencePtr] = useState<number | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (referencePtr !== null) {
+                freeSpectralReference(referencePtr);
+            }
+        };
+    }, [referencePtr]);
+
+    const captureRef = () => {
+        if (!sourceBuffer) return;
+        // cleanup is handled by useEffect when referencePtr changes
+        const ptr = captureSpectralReference(sourceBuffer);
+        setReferencePtr(ptr);
+        setStatus('Reference Captured');
+        setTimeout(() => setStatus(null), 2000);
+    };
     
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
@@ -258,6 +276,24 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 label="Mono Bass" 
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
                                 disabled={!sourceBuffer || isProcessing}
+                            />
+                        </div>
+                    </section>
+
+                    <section>
+                        <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Spectral Match</h2>
+                        <div className="space-y-2">
+                             <ToolButton
+                                icon={<Upload size={14} />}
+                                label={referencePtr ? "Update Reference" : "Capture Reference"}
+                                onClick={captureRef}
+                                disabled={!sourceBuffer || isProcessing}
+                            />
+                            <ToolButton
+                                icon={<Wand2 size={14} />}
+                                label="Apply Match"
+                                onClick={() => runTool('spectralMatch', 'Spectral Match', { refPtr: referencePtr, amount: 1.0, smooth: 0.0 })}
+                                disabled={!sourceBuffer || isProcessing || !referencePtr}
                             />
                         </div>
                     </section>

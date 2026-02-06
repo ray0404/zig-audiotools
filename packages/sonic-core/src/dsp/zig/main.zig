@@ -1,5 +1,10 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
+const spectralmatch = @import("spectralmatch.zig");
+
+comptime {
+    _ = spectralmatch;
+}
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
