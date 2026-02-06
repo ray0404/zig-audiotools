@@ -1,5 +1,6 @@
 const std = @import("std");
 const math = @import("math_utils.zig");
+const plosive = @import("plosiveguard.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
@@ -273,54 +274,6 @@ export fn process_spectral_denoise(ptr: [*]f32, len: usize) void {
 // Linkwitz-Riley 4th order LPF/HPF
 // Cascaded Butterworth 2nd order
 
-const Biquad = struct {
-    a1: f32 = 0, a2: f32 = 0,
-    b0: f32 = 0, b1: f32 = 0, b2: f32 = 0,
-    x1: f32 = 0, x2: f32 = 0,
-    y1: f32 = 0, y2: f32 = 0,
-
-    fn process(self: *Biquad, input: f32) f32 {
-        const output = self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2 - self.a1 * self.y1 - self.a2 * self.y2;
-        self.x2 = self.x1;
-        self.x1 = input;
-        self.y2 = self.y1;
-        self.y1 = output;
-        return output;
-    }
-};
-
-fn calc_lpf_coeffs(fc: f32, sample_rate: f32) Biquad {
-    // Butterworth 2nd order LPF
-    const w0 = math.TWO_PI * fc / sample_rate;
-    const cos_w0 = std.math.cos(w0);
-    const alpha = std.math.sin(w0) / std.math.sqrt(2.0); // Q = 0.707 for Butterworth
-
-    const a0 = 1 + alpha;
-    return .{
-        .b0 = (1 - cos_w0) / 2 / a0,
-        .b1 = (1 - cos_w0) / a0,
-        .b2 = (1 - cos_w0) / 2 / a0,
-        .a1 = -2 * cos_w0 / a0,
-        .a2 = (1 - alpha) / a0,
-    };
-}
-
-fn calc_hpf_coeffs(fc: f32, sample_rate: f32) Biquad {
-    // Butterworth 2nd order HPF
-    const w0 = math.TWO_PI * fc / sample_rate;
-    const cos_w0 = std.math.cos(w0);
-    const alpha = std.math.sin(w0) / std.math.sqrt(2.0);
-
-    const a0 = 1 + alpha;
-    return .{
-        .b0 = (1 + cos_w0) / 2 / a0,
-        .b1 = -(1 + cos_w0) / a0,
-        .b2 = (1 + cos_w0) / 2 / a0,
-        .a1 = -2 * cos_w0 / a0,
-        .a2 = (1 - alpha) / a0,
-    };
-}
-
 // Since we process L and R separately but the buffer is likely interleaved or mono?
 // The prompt implies a single buffer `process_mono_bass`.
 // If it's stereo interleaved, we need to know channels.
@@ -340,14 +293,14 @@ export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32
     const data = ptr[0..len];
     
     // 2 cascaded Butterworths = Linkwitz-Riley 4th order
-    var lpf_l1 = calc_lpf_coeffs(freq, sample_rate);
+    var lpf_l1 = math.calc_lpf_coeffs(freq, sample_rate);
     var lpf_l2 = lpf_l1; // Copy coeffs, separate state
-    var lpf_r1 = calc_lpf_coeffs(freq, sample_rate);
+    var lpf_r1 = math.calc_lpf_coeffs(freq, sample_rate);
     var lpf_r2 = lpf_r1;
 
-    var hpf_l1 = calc_hpf_coeffs(freq, sample_rate);
+    var hpf_l1 = math.calc_hpf_coeffs(freq, sample_rate);
     var hpf_l2 = hpf_l1;
-    var hpf_r1 = calc_hpf_coeffs(freq, sample_rate);
+    var hpf_r1 = math.calc_hpf_coeffs(freq, sample_rate);
     var hpf_r2 = hpf_r1;
 
     var i: usize = 0;
@@ -376,4 +329,17 @@ export fn process_mono_bass(ptr: [*]f32, len: usize, sample_rate: f32, freq: f32
         data[i] = low_mono + high_l;
         data[i+1] = low_mono + high_r;
     }
+}
+
+// --- 6. Plosive Guard ---
+
+export fn process_plosiveguard(
+    ptr: [*]f32,
+    len: usize,
+    sample_rate: f32,
+    sensitivity: f32,
+    strength: f32,
+    cutoff: f32
+) void {
+    plosive.process_plosiveguard(ptr, len, sample_rate, sensitivity, strength, cutoff);
 }

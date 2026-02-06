@@ -19,6 +19,9 @@ export const SmartToolsWorkspace: React.FC = () => {
     const [status, setStatus] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>('');
     
+    // Tool Params
+    const [plosiveParams, setPlosiveParams] = useState({ sensitivity: 0.5, strength: 0.8, cutoff: 150 });
+
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
     const [playbackMode, setPlaybackMode] = useState<'source' | 'processed'>('processed');
@@ -259,6 +262,56 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
                                 disabled={!sourceBuffer || isProcessing}
                             />
+
+                            {/* Plosive Guard */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Wand2 size={14} />}
+                                    label="Plosive Guard"
+                                    onClick={() => runTool('plosiveGuard', 'Plosive Guard', plosiveParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-2 px-1">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Sensitivity</span>
+                                            <span>{plosiveParams.sensitivity.toFixed(2)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="1" step="0.01"
+                                            value={plosiveParams.sensitivity}
+                                            onChange={(e) => setPlosiveParams({...plosiveParams, sensitivity: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Strength</span>
+                                            <span>{plosiveParams.strength.toFixed(2)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="1" step="0.01"
+                                            value={plosiveParams.strength}
+                                            onChange={(e) => setPlosiveParams({...plosiveParams, strength: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Cutoff (Hz)</span>
+                                            <span>{plosiveParams.cutoff}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="80" max="250" step="1"
+                                            value={plosiveParams.cutoff}
+                                            onChange={(e) => setPlosiveParams({...plosiveParams, cutoff: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
