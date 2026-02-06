@@ -3,6 +3,7 @@ const math = @import("math_utils.zig");
 const plosive = @import("plosiveguard.zig");
 const voice_isolate = @import("voice_isolate.zig");
 const debleed = @import("debleed.zig");
+const stabilizer = @import("tape_stabilizer.zig");
 
 // Import SmartLevel module to ensure its exported functions are included
 pub usingnamespace @import("smart_level.zig");
@@ -460,4 +461,18 @@ export fn process_debleed(ptr_target: [*]f32, ptr_source: [*]f32, len: usize, se
         // Ignore allocation errors for now in WASM context (or log if possible)
         _ = err;
     };
+}
+
+// --- 10. Tape Stabilizer ---
+
+export fn process_tapestabilizer(
+    ptr: [*]f32,
+    len: usize,
+    sample_rate: f32,
+    nominal_freq: f32,
+    scan_freq_min: f32,
+    scan_freq_max: f32,
+    correction_amount: f32
+) void {
+    stabilizer.process_tapestabilizer(ptr, len, sample_rate, nominal_freq, scan_freq_min, scan_freq_max, correction_amount);
 }

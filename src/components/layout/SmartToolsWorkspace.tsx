@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { initProcessor, processAudioBuffer } from '@/services/Processor';
 import { audioBufferToWav } from '@/utils/wav-export';
@@ -6,7 +5,7 @@ import { saveAs } from 'file-saver';
 import { 
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
-    Settings2, ChevronRight, Mic, Activity, Droplets
+    Settings2, ChevronRight, Mic, Activity, Droplets, FastForward
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
@@ -289,6 +288,13 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 label="DeBleed Lite"
                                 onClick={() => runTool('debleed', 'DeBleed', { sensitivity: 0.5, threshold: -40 })}
                                 disabled={!sourceBuffer || isProcessing || sourceBuffer.numberOfChannels < 2}
+                            />
+
+                            <ToolButton
+                                icon={<FastForward size={14} />}
+                                label="Tape Stabilizer"
+                                onClick={() => runTool('tapeStabilizer', 'Tape Fix', { nominalFreq: 60.0, amount: 1.0 })}
+                                disabled={!sourceBuffer || isProcessing}
                             />
 
                             {/* Plosive Guard */}

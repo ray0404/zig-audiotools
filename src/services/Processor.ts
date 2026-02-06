@@ -24,7 +24,7 @@ export function getProcessorSDK() {
  */
 export async function processAudioBuffer(
     audioBuffer: AudioBuffer, 
-    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed',
+    tool: 'declip' | 'lufs' | 'phase' | 'denoise' | 'monoBass' | 'plosiveGuard' | 'voiceIsolate' | 'psychodynamic' | 'smartLevel' | 'debleed' | 'tapeStabilizer',
     params?: any
 ): Promise<AudioBuffer> {
     const sdk = getProcessorSDK();
@@ -124,6 +124,16 @@ export async function processAudioBuffer(
                     params?.targetLufs || -16,
                     params?.maxGainDb || 6,
                     params?.gateThresholdDb || -50
+                );
+                break;
+            case 'tapeStabilizer':
+                processed = sdk.processTapeStabilizer(
+                    channelData,
+                    sampleRate,
+                    params?.nominalFreq ?? 60.0,
+                    params?.scanMin ?? 55.0,
+                    params?.scanMax ?? 65.0,
+                    params?.amount ?? 1.0
                 );
                 break;
             default:

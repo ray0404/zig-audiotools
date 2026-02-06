@@ -134,4 +134,18 @@ export class SonicForgeSDK {
       free(ptrSource, len);
     }
   }
+
+  processTapeStabilizer(
+    channelData: Float32Array,
+    sampleRate: number,
+    nominalFreq: number,
+    scanMin: number,
+    scanMax: number,
+    amount: number
+  ): Float32Array {
+    const { process_tapestabilizer } = this.wasmInstance!.exports as any;
+    return this.processBuffer(channelData, (ptr, len) =>
+      process_tapestabilizer(ptr, len, sampleRate, nominalFreq, scanMin, scanMax, amount)
+    );
+  }
 }
