@@ -107,3 +107,51 @@ pub fn linearToDb(linear: f32) f32 {
     if (linear <= 0.000001) return -120.0;
     return 20.0 * std.math.log10(linear);
 }
+
+pub const Biquad = struct {
+    a1: f32 = 0, a2: f32 = 0,
+    b0: f32 = 0, b1: f32 = 0, b2: f32 = 0,
+    x1: f32 = 0, x2: f32 = 0,
+    y1: f32 = 0, y2: f32 = 0,
+
+    pub fn process(self: *Biquad, input: f32) f32 {
+        const output = self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2 - self.a1 * self.y1 - self.a2 * self.y2;
+        self.x2 = self.x1;
+        self.x1 = input;
+        self.y2 = self.y1;
+        self.y1 = output;
+        return output;
+    }
+};
+
+pub fn calc_lpf_coeffs(fc: f32, sample_rate: f32) Biquad {
+    // Butterworth 2nd order LPF
+    const w0 = TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / std.math.sqrt(2.0); // Q = 0.707 for Butterworth
+
+    const a0 = 1 + alpha;
+    return .{
+        .b0 = (1 - cos_w0) / 2 / a0,
+        .b1 = (1 - cos_w0) / a0,
+        .b2 = (1 - cos_w0) / 2 / a0,
+        .a1 = -2 * cos_w0 / a0,
+        .a2 = (1 - alpha) / a0,
+    };
+}
+
+pub fn calc_hpf_coeffs(fc: f32, sample_rate: f32) Biquad {
+    // Butterworth 2nd order HPF
+    const w0 = TWO_PI * fc / sample_rate;
+    const cos_w0 = std.math.cos(w0);
+    const alpha = std.math.sin(w0) / std.math.sqrt(2.0);
+
+    const a0 = 1 + alpha;
+    return .{
+        .b0 = (1 + cos_w0) / 2 / a0,
+        .b1 = -(1 + cos_w0) / a0,
+        .b2 = (1 + cos_w0) / 2 / a0,
+        .a1 = -2 * cos_w0 / a0,
+        .a2 = (1 - alpha) / a0,
+    };
+}
