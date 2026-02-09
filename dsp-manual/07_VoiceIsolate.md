@@ -20,7 +20,10 @@ The signal is transformed into the frequency domain using a Window Size of 1024 
 
 ### 2. Bark Band Integration
 The 513 unique frequency bins are mapped onto **22 Bark Scale Bands**. The Bark scale approximates the critical bands of human hearing. The energy in each band is calculated.
-$$ E_b = \sum_{k \in Band_b} |X[k]|^2 $$
+
+```math
+E_b = sum(|X[k]|^2) for k in Band_b
+```
 
 ### 3. "Inference" / Gating
 While the architecture supports a GRU/RNN inference model, the current lightweight implementation uses a heuristic energy thresholding per band.
@@ -29,7 +32,10 @@ While the architecture supports a GRU/RNN inference model, the current lightweig
 
 ### 4. Mask Application
 The computed gain mask (22 values) is interpolated back to the linear frequency bins and multiplied with the complex spectrum.
-$$ X_{new}[k] = X[k] \cdot \text{Mask}[k] $$
+
+```math
+X_new[k] = X[k] * Mask[k]
+```
 
 ### 5. Reconstruction
 An Inverse STFT with Overlap-Add reconstruction creates the final isolated audio.

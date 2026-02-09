@@ -30,18 +30,27 @@ Before measurement, the audio is passed through a **K-weighting** pre-filter to 
 
 ### 2. Mean Square Calculation
 The filtered signal is squared and averaged over the duration of the file (Integrated Loudness).
-$$ z_i = \text{filtered\_sample}\_i^2 $$
-$$ \text{MeanSquare} = \frac{1}{N} \sum_{i=0}^{N-1} z_i $$
+
+```math
+z_i = filtered_sample_i^2
+MeanSquare = (1/N) * sum(z_i) from i=0 to N-1
+```
 
 ### 3. Loudness Calculation
 The RMS value is converted to Decibels (dB) and then to LUFS by applying a relative gate offset (though the current simplified implementation uses a direct RMS approximation for performance).
-$$ \text{LUFS} = 10 \log_{10}(\text{MeanSquare}) - 0.691 $$
+
+```math
+LUFS = 10 * log10(MeanSquare) - 0.691
+```
 *(The -0.691 offset is standard for aligning K-weighted RMS with subjective loudness perception).*
 
 ### 4. Gain Application
 The difference between the **Target LUFS** and **Measured LUFS** is calculated, and a constant linear gain is applied to the entire signal.
-$$ \Delta \text{dB} = \text{Target} - \text{Measured} $$
-$$ \text{LinearGain} = 10^{\frac{\Delta \text{dB}}{20}} $$
+
+```math
+Delta_dB = Target - Measured
+LinearGain = 10^(Delta_dB / 20)
+```
 
 ## Implementation Details
 *   **Source File**: `packages/sonic-core/src/dsp/zig/main.zig`

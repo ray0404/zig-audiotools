@@ -27,9 +27,13 @@ A **Linkwitz-Riley 4th Order Crossover** splits the signal into `Low` (Pop band)
 ### 2. Detection Logic (The "Guard")
 The detector monitors the energy ratio and "flux" (rate of change) of the low band.
 *   **Flux Detection**: Calculates the derivative of the low-band energy. Plosives are characterized by an explosive rise in low-frequency energy.
-    $$ \Delta E_{low} > \text{FluxThreshold}(\text{Sensitivity}) $$
+    ```math
+    Delta E_low > FluxThreshold(Sensitivity)
+    ```
 *   **Ratio Check**: Ensures the event is bass-heavy (unlike a snare drum or loud vowel).
-    $$ E_{low} > E_{high} + 12\text{dB} $$
+    ```math
+    E_low > E_high + 12dB
+    ```
 
 ### 3. Dynamic Attenuation
 If both conditions are met, a gain envelope is triggered.
@@ -39,7 +43,9 @@ If both conditions are met, a gain envelope is triggered.
 
 ### 4. Recombination
 The signal is reconstructed by summing the processed Low band and the untouched High band.
-$$ Out = (Low \cdot Gain(t)) + High $$
+```math
+Out = (Low * Gain(t)) + High
+```
 
 ## Implementation Details
 *   **Source File**: `packages/sonic-core/src/dsp/zig/plosiveguard.zig`

@@ -27,7 +27,10 @@ Pre-filtering with a High-Pass Filter (approx 38Hz) ensures sub-bass doesn't ske
 
 ### 2. Gain Computer
 Calculates the raw gain needed to bring the current RMS to the Target.
-$$ \text{RawGain} = \text{Target} - \text{CurrentRMS} $$
+
+```math
+RawGain = Target - CurrentRMS
+```
 
 ### 3. Gating Logic
 If the current signal is below the `Gate Threshold` (e.g., silence between sentences), the gain freezes at its last valid value. This prevents "breathing" or rushing noise floor up during pauses.

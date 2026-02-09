@@ -20,25 +20,30 @@ The core algorithm relies on **Cubic Hermite Spline Interpolation**.
 
 ### 1. Detection
 The algorithm scans the audio buffer for samples where the absolute value exceeds the `threshold`.
-$$ |x[n]| \ge \text{Threshold} $$
-It groups consecutive clipped samples into a "clipped interval" $[start, end]$.
+
+```math
+abs(x[n]) >= Threshold
+```
+It groups consecutive clipped samples into a "clipped interval" `[start, end]`.
 
 ### 2. Constraint Checks
 To ensure meaningful restoration, the algorithm requires:
 *   The interval must have at least 3 consecutive clipped samples (to distinguish from transient noise).
-*   Valid "anchor points" must exist before and after the clipped region (indices $start-2$ and $end+2$).
+*   Valid "anchor points" must exist before and after the clipped region (indices `start-2` and `end+2`).
 
 ### 3. Cubic Hermite Interpolation
 The algorithm uses four samples surrounding the clipped region as control points:
-*   $p_0 = x[start-2]$
-*   $p_1 = x[start-1]$ (Left Anchor)
-*   $p_2 = x[end]$ (Right Anchor)
-*   $p_3 = x[end+1]$
+*   `p0 = x[start-2]`
+*   `p1 = x[start-1]` (Left Anchor)
+*   `p2 = x[end]` (Right Anchor)
+*   `p3 = x[end+1]`
 
-A Cubic Hermite Spline is generated to smoothly bridge $p_1$ and $p_2$, preserving both the slope (first derivative) and continuity of the waveform. The spline "overshoots" the flat top, effectively predicting where the natural peak of the wave would have been if it hadn't been clipped.
+A Cubic Hermite Spline is generated to smoothly bridge `p1` and `p2`, preserving both the slope (first derivative) and continuity of the waveform. The spline "overshoots" the flat top, effectively predicting where the natural peak of the wave would have been if it hadn't been clipped.
 
-$$ \text{Interpolated}(t) = \text{CubicHermite}(p_0, p_1, p_2, p_3, t) $$
-Where $t$ ranges from 0 to 1 across the duration of the clipped interval.
+```math
+Interpolated(t) = CubicHermite(p0, p1, p2, p3, t)
+```
+Where `t` ranges from 0 to 1 across the duration of the clipped interval.
 
 ## Implementation Details
 *   **Source File**: `packages/sonic-core/src/dsp/zig/main.zig`

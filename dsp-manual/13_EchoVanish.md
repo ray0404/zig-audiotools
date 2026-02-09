@@ -20,24 +20,33 @@ The algorithm is based on the **Weighted Prediction Error (WPE)** method, a stat
 
 ### 1. The Reverb Model
 Reverb is modeled as a convolution of the source signal with a Room Impulse Response (RIR). The "Late Reverberation" (the tail) is highly correlated with the "Direct Signal" (the dry sound), but delayed.
-$$ y[n] = x[n] + \text{LateReverb}(x[n]) $$
+
+```math
+y[n] = x[n] + LateReverb(x[n])
+```
 
 ### 2. Linear Prediction
-WPE attempts to predict the Late Reverberation component of the current frame $Y_n$ based on a history of previous frames $Y_{n-D} \dots Y_{n-D-K}$.
-$$ \hat{R}[n] = \sum_{k=0}^{K} G_k^H \cdot Y[n - D - k] $$
+WPE attempts to predict the Late Reverberation component of the current frame `Y_n` based on a history of previous frames `Y_{n-D} ... Y_{n-D-K}`.
+
+```math
+R_hat[n] = sum(G_k^H * Y[n - D - k]) for k=0 to K
+```
 Where:
-*   $D$: Delay (skip early reflections to preserve body).
-*   $K$: Prediction Order (derived from `Tail ms`).
-*   $G$: Prediction Filter Weights.
+*   `D`: Delay (skip early reflections to preserve body).
+*   `K`: Prediction Order (derived from `Tail ms`).
+*   `G`: Prediction Filter Weights.
 
 ### 3. Decorrelation (The "Vanish")
-The filter weights $G$ are estimated to minimize the variance of the residual (the prediction error). Since the dry signal is unpredictable (uncorrelated with its past in the long term) and reverb IS predictable, removing the predicted component removes the reverb.
-$$ \text{Clean}[n] = Y[n] - \text{Amount} \cdot \hat{R}[n] $$
+The filter weights `G` are estimated to minimize the variance of the residual (the prediction error). Since the dry signal is unpredictable (uncorrelated with its past in the long term) and reverb IS predictable, removing the predicted component removes the reverb.
+
+```math
+Clean[n] = Y[n] - Amount * R_hat[n]
+```
 
 ### Implementation (Simplified WPE)
 This module implements a computationally efficient variant of WPE in the Short-Time Fourier Transform (STFT) domain.
 1.  **STFT**: Convert to frequency domain.
-2.  **MIMO Linear Solver**: For each frequency bin, a linear system $R \cdot G = P$ is solved to find the prediction filter $G$.
+2.  **MIMO Linear Solver**: For each frequency bin, a linear system `R * G = P` is solved to find the prediction filter `G`.
 3.  **Subtraction**: The predicted reverb tail is subtracted from the spectrum.
 4.  **ISTFT**: Signal is reconstructed.
 

@@ -18,7 +18,7 @@ Tape Stabilizer corrects **Wow and Flutter** (pitch fluctuations) inherent in an
 The system uses **YIN Pitch Detection** combined with **Varispeed Resampling**.
 
 ### 1. YIN Pitch Detection
-The input signal is analyzed using the YIN algorithm (a robust autocorrelation-based method) to detect the fundamental frequency $f_{measured}(t)$ within a narrow range around the Nominal Frequency (e.g., 55Hz - 65Hz for a 60Hz target).
+The input signal is analyzed using the YIN algorithm (a robust autocorrelation-based method) to detect the fundamental frequency `f_measured(t)` within a narrow range around the Nominal Frequency (e.g., 55Hz - 65Hz for a 60Hz target).
 *   YIN uses a "Difference Function" rather than simple correlation to minimize octave errors.
 
 ### 2. Smoothing
@@ -26,7 +26,10 @@ The detected frequency curve is smoothed using a **Median Filter** (window size 
 
 ### 3. Varispeed Resampling
 The algorithm calculates a playback speed curve to counteract the drift.
-$$ 	ext{Speed}(t) = rac{	ext{Nominal Freq}}{f_{measured}(t)} $$
+
+```math
+Speed(t) = Nominal_Freq / f_measured(t)
+```
 *   If the tape ran slow (Measured < Nominal), speed > 1 (speed up).
 *   If the tape ran fast (Measured > Nominal), speed < 1 (slow down).
 

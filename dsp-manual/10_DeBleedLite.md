@@ -31,8 +31,11 @@ The algorithm calculates the RMS of the Source frame.
 
 ### 3. Spectral Subtraction
 If bleed is detected, the algorithm estimates the bleed magnitude in the Target spectrum based on the Source spectrum.
-$$ 	ext{BleedEst}[k] = |X_{source}[k]|  0.3 $$
-$$ |X_{target_new}[k]| = |X_{target}[k]| - (	ext{BleedEst}[k]  	ext{Sensitivity}) $$
+
+```math
+BleedEst[k] = |X_source[k]| * 0.3
+|X_target_new[k]| = |X_target[k]| - (BleedEst[k] * Sensitivity)
+```
 
 This subtracts the frequency footprint of the Source from the Target, effectively "erasing" the bleed.
 

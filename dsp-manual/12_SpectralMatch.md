@@ -24,14 +24,17 @@ Both the Target and Reference signals are analyzed to compute their Average Powe
 
 ### 2. Filter Computation
 The "Difference Curve" (Transfer Function) is calculated:
-$$ H_{mag}[k] = \sqrt{\frac{P_{ref}[k]}{P_{target}[k]}} $$
+
+```math
+H_mag[k] = sqrt(P_ref[k] / P_target[k])
+```
 This magnitude response represents the EQ curve needed to turn Target into Reference.
 *   **Clamping**: The curve is clamped to +/- 12dB to prevent extreme resonance.
 
 ### 3. Impulse Response Generation
 1.  The Magnitude response is converted to a symmetric complex spectrum (Zero Phase).
 2.  **Inverse FFT** generates a time-domain Impulse Response.
-3.  **Circular Shift**: The IR is rotated by $N/2$ samples to center the impulse, making it **Linear Phase**. This ensures the matching EQ does not introduce phase distortion or "smearing" of transients.
+3.  **Circular Shift**: The IR is rotated by `N/2` samples to center the impulse, making it **Linear Phase**. This ensures the matching EQ does not introduce phase distortion or "smearing" of transients.
 
 ### 4. Convolution
 The Target audio is convolved with this generated Impulse Response to apply the EQ curve.

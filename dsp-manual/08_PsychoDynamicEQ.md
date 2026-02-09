@@ -22,17 +22,23 @@ The algorithm uses an **RMS-driven Dynamic Filter Bank**.
 
 ### 1. Energy Detection
 The RMS (Root Mean Square) energy of the signal is tracked using a fast attack (100ms) and slow release (500ms) envelope follower.
-$$ E_{rms} = \sqrt{\text{MeanSquare}} $$
+
+```math
+E_rms = sqrt(MeanSquare)
+```
 
 ### 2. Deficit Calculation
 The algorithm calculates how far the current volume is below the reference level.
-$$ \text{Deficit}_{dB} = (\text{Ref}_{dB} - \text{Current}_{dB}) \cdot \text{Intensity} $$
+
+```math
+Deficit_dB = (Ref_dB - Current_dB) * Intensity
+```
 
 ### 3. Dynamic Filter Coefficients
 Three filters are adjusted per sample block based on the deficit:
-1.  **Low Shelf (100Hz)**: Boosts bass. Gain $\approx 0.4 \times \text{Deficit}$.
-2.  **Mid Bell (2.5kHz)**: Cuts harshness slightly. Gain $\approx -0.1 \times \text{Deficit}$.
-3.  **High Shelf (10kHz)**: Boosts "air". Gain $\approx 0.2 \times \text{Deficit}$.
+1.  **Low Shelf (100Hz)**: Boosts bass. Gain `~ 0.4 * Deficit`.
+2.  **Mid Bell (2.5kHz)**: Cuts harshness slightly. Gain `~ -0.1 * Deficit`.
+3.  **High Shelf (10kHz)**: Boosts "air". Gain `~ 0.2 * Deficit`.
 
 *Example: If the audio drops 10dB below reference, the Low Shelf might boost by +4dB and High Shelf by +2dB, making the quiet section sound fuller.*
 

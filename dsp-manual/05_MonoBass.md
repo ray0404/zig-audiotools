@@ -22,17 +22,19 @@ The LR4 filter is created by cascading two 2nd-order Butterworth filters. It pro
 *   **High-Pass Filter (HPF)**: Isolates mids/highs.
 
 ### 2. Summation Logic
-For each sample frame (Left $L$, Right $R$):
+For each sample frame (Left `L`, Right `R`):
 1.  **Filter**:
-    *   $L_{low} = \text{LPF}(L)$, $R_{low} = \text{LPF}(R)$
-    *   $L_{high} = \text{HPF}(L)$, $R_{high} = \text{HPF}(R)$
+    *   `L_low = LPF(L)`, `R_low = LPF(R)`
+    *   `L_high = HPF(L)`, `R_high = HPF(R)`
 2.  **Sum to Mono**:
     The low-frequency components are averaged.
-    $$ M_{low} = \frac{L_{low} + R_{low}}{2} $$
+    ```math
+    M_low = (L_low + R_low) / 2
+    ```
 3.  **Recombine**:
     The mono bass is added back to the original stereo high frequencies.
-    *   $L_{out} = M_{low} + L_{high}$
-    *   $R_{out} = M_{low} + R_{high}$
+    *   `L_out = M_low + L_high`
+    *   `R_out = M_low + R_high`
 
 ## Implementation Details
 *   **Source File**: `packages/sonic-core/src/dsp/zig/main.zig`

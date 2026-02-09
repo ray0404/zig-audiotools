@@ -16,18 +16,21 @@ The effect is achieved using a chain of **First-Order All-Pass Filters**.
 
 ### All-Pass Filter Theory
 An all-pass filter has a flat magnitude response (gain = 1 across all frequencies) but a frequency-dependent phase response.
-$$ H(z) = \frac{c + z^{-1}}{1 + c z^{-1}} $$
-Where $c$ is the filter coefficient.
+
+```math
+H(z) = (c + z^-1) / (1 + c * z^-1)
+```
+Where `c` is the filter coefficient.
 
 ### Phase Dispersion
 When multiple all-pass filters are cascaded, their group delays sum up. Low frequencies are delayed differently than high frequencies. This "smears" the energy of a transient over a slightly longer time window, reducing the constructive interference that creates massive peaks in asymmetrical signals.
 
 **Filter Chain Configuration:**
 The module uses a chain of 4 filters with alternating signs to create a specific phase curve:
-1.  $c = 0.4$
-2.  $c = -0.4$
-3.  $c = 0.6$
-4.  $c = -0.6$
+1.  `c = 0.4`
+2.  `c = -0.4`
+3.  `c = 0.6`
+4.  `c = -0.6`
 
 This configuration mimics the behavior of analog "Disperser" hardware units often used in broadcast processing.
 
@@ -35,5 +38,7 @@ This configuration mimics the behavior of analog "Disperser" hardware units ofte
 *   **Source File**: `packages/sonic-core/src/dsp/zig/main.zig`
 *   **Function**: `process_phase_rotation`
 *   **Structure**: Uses a `struct AllPass` maintaining `x1` and `y1` state variables for the difference equation:
-    $$ y[n] = c \cdot x[n] + x[n-1] - c \cdot y[n-1] $$
+    ```math
+    y[n] = c * x[n] + x[n-1] - c * y[n-1]
+    ```
 *   **Processing**: Iterates through the sample buffer, passing each sample through the 4-stage filter chain sequentially.
