@@ -95,7 +95,7 @@ export async function processAudioBuffer(
 
             switch (tool) {
                 case 'declip':
-                    processed = sdk.processDeclip(channelData);
+                    processed = sdk.processDeclip(channelData, params?.threshold || 0.99);
                     break;
                 case 'lufs':
                     processed = sdk.processLufsNormalize(channelData, params?.targetLufs || -14);
@@ -104,7 +104,7 @@ export async function processAudioBuffer(
                     processed = sdk.processPhaseRotation(channelData);
                     break;
                 case 'denoise':
-                    processed = sdk.processSpectralDenoise(channelData);
+                    processed = sdk.processSpectralDenoise(channelData, params?.noiseBuffer?.getChannelData(0));
                     break;
                 case 'monoBass':
                     // For mono tracks, it just applies filters

@@ -20,8 +20,27 @@ export const SmartToolsWorkspace: React.FC = () => {
     const [status, setStatus] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>('');
     
+    // History State
+    const [history, setHistory] = useState<AudioBuffer[]>([]);
+    const [historyIndex, setHistoryIndex] = useState(-1);
+
     // Tool Params
     const [plosiveParams, setPlosiveParams] = useState({ sensitivity: 0.5, strength: 0.8, cutoff: 150 });
+    const [echoParams, setEchoParams] = useState({ amount: 0.8, tailMs: 200 });
+    const [smartLevelParams, setSmartLevelParams] = useState({ targetLufs: -14, maxGainDb: 12, gateThresholdDb: -60 });
+    
+    // New Params
+    const [lufsParams, setLufsParams] = useState({ targetLufs: -14 });
+    const [monoBassParams, setMonoBassParams] = useState({ cutoff: 120 });
+    const [voiceIsolateParams, setVoiceIsolateParams] = useState({ amount: 1.0 });
+    const [psychoParams, setPsychoParams] = useState({ intensity: 1.0, refDb: -18.0 });
+    const [debleedParams, setDebleedParams] = useState({ sensitivity: 0.5, threshold: -40 });
+    const [declipParams, setDeclipParams] = useState({ threshold: 0.95 });
+    const [tapeParams, setTapeParams] = useState({ nominalFreq: 60, amount: 1.0 });
+    const [spectralMatchParams, setSpectralMatchParams] = useState({ amount: 1.0 });
+
+    // Noise Profile State
+    const [noiseProfile, setNoiseProfile] = useState<{ start: number | null, end: number | null, buffer: AudioBuffer | null }>({ start: null, end: null, buffer: null });
 
     // Playback state
     const [isPlaying, setIsPlaying] = useState(false);
@@ -60,6 +79,45 @@ export const SmartToolsWorkspace: React.FC = () => {
             drawWaveform(processedBuffer, processedCanvasRef.current, '#3b82f6');
         }
     }, [processedBuffer]);
+
+    const addToHistory = (buffer: AudioBuffer) => {
+        setHistory(prev => {
+            const newHistory = prev.slice(0, historyIndex + 1);
+            newHistory.push(buffer);
+            // Limit history
+            if (newHistory.length > 20) newHistory.shift();
+            return newHistory;
+        });
+        setHistoryIndex(prev => Math.min(prev + 1, 19));
+        setProcessedBuffer(buffer);
+    };
+
+    const handleUndo = () => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            setProcessedBuffer(history[newIndex]);
+            if (isPlaying && playbackMode === 'processed') {
+                stopPlayback(); // Stop to avoid glitch
+            }
+        } else if (historyIndex === 0) {
+             // Undo back to source state if needed, or just keep index 0
+             // Ideally index 0 is the first processed state. 
+             // Let's handle 'Source' as distinct from history? 
+             // Actually, if we want to undo 'back to original', we can treat source as initial history
+        }
+    };
+
+    const handleRedo = () => {
+        if (historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1;
+            setHistoryIndex(newIndex);
+            setProcessedBuffer(history[newIndex]);
+            if (isPlaying && playbackMode === 'processed') {
+                stopPlayback();
+            }
+        }
+    };
 
     const drawWaveform = (buffer: AudioBuffer, canvas: HTMLCanvasElement, color: string) => {
         const ctx = canvas.getContext('2d');
@@ -114,6 +172,10 @@ export const SmartToolsWorkspace: React.FC = () => {
             }
             setProcessedBuffer(clone);
             
+            // Init history with the initial clone
+            setHistory([clone]);
+            setHistoryIndex(0);
+
             setStatus(null);
         } catch (err) {
             setStatus('Error decoding audio');
@@ -199,7 +261,8 @@ export const SmartToolsWorkspace: React.FC = () => {
         
         try {
             const result = await processAudioBuffer(processedBuffer || sourceBuffer, tool, params);
-            setProcessedBuffer(result);
+            // setProcessedBuffer(result); // Replaced by addToHistory
+            addToHistory(result);
             setStatus(`Applied ${label}`);
             setTimeout(() => setStatus(null), 2000);
             
@@ -226,6 +289,26 @@ export const SmartToolsWorkspace: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
+                    {/* Undo/Redo Controls */}
+                    <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
+                        <button 
+                            onClick={handleUndo}
+                            disabled={historyIndex <= 0}
+                            className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+                            title="Undo"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                        </button>
+                        <button 
+                            onClick={handleRedo}
+                            disabled={historyIndex >= history.length - 1}
+                            className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white disabled:opacity-30 transition-colors"
+                            title="Redo"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 3.7"/></svg>
+                        </button>
+                    </div>
+
                     {status && (
                         <div className="text-xs font-mono text-blue-400 animate-pulse flex items-center gap-2 bg-blue-950/30 px-3 py-1.5 rounded-full border border-blue-900/30">
                             {isProcessing && <Loader2 size={12} className="animate-spin" />}
@@ -249,79 +332,370 @@ export const SmartToolsWorkspace: React.FC = () => {
                     <section>
                         <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Processors</h2>
                         <div className="space-y-2 overflow-y-auto pr-2 max-h-[calc(100vh-250px)]">
-                            <ToolButton 
-                                icon={<Settings2 size={14} />} 
-                                label="Loudness Normalize" 
-                                onClick={() => runTool('lufs', 'Normalization', { targetLufs: -14 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                            {/* Loudness Normalize */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton 
+                                    icon={<Settings2 size={14} />} 
+                                    label="Loudness Normalize" 
+                                    onClick={() => runTool('lufs', 'Normalization', lufsParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-1 px-1">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                        <span>Target LUFS</span>
+                                        <span>{lufsParams.targetLufs}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="-24" max="-6" step="0.5"
+                                        value={lufsParams.targetLufs}
+                                        onChange={(e) => setLufsParams({...lufsParams, targetLufs: parseFloat(e.target.value)})}
+                                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                </div>
+                            </div>
+
                             <ToolButton 
                                 icon={<ChevronRight size={14} />} 
                                 label="Phase Rotation" 
                                 onClick={() => runTool('phase', 'Phase Fix')}
                                 disabled={!sourceBuffer || isProcessing}
                             />
-                            <ToolButton 
-                                icon={<Wand2 size={14} />} 
-                                label="De-Clip" 
-                                onClick={() => runTool('declip', 'De-Clip')}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
-                            <ToolButton 
-                                icon={<ChevronRight size={14} />} 
-                                label="Spectral Denoise" 
-                                onClick={() => runTool('denoise', 'Denoise')}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
-                            <ToolButton 
-                                icon={<ChevronRight size={14} />} 
-                                label="Mono Bass" 
-                                onClick={() => runTool('monoBass', 'Mono Bass', { cutoff: 120 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                            
+                            {/* De-Clip */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton 
+                                    icon={<Wand2 size={14} />} 
+                                    label="De-Clip" 
+                                    onClick={() => runTool('declip', 'De-Clip', declipParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-1 px-1">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                        <span>Threshold</span>
+                                        <span>{declipParams.threshold.toFixed(2)}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0.5" max="1.0" step="0.01"
+                                        value={declipParams.threshold}
+                                        onChange={(e) => setDeclipParams({...declipParams, threshold: parseFloat(e.target.value)})}
+                                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                </div>
+                            </div>
 
-                            <ToolButton
-                                icon={<Mic size={14} />}
-                                label="Voice Isolate"
-                                onClick={() => runTool('voiceIsolate', 'Voice Isolate', { amount: 1.0 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                            {/* Spectral Denoise */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton 
+                                    icon={<ChevronRight size={14} />} 
+                                    label="Spectral Denoise" 
+                                    onClick={() => runTool('denoise', 'Denoise', { noiseBuffer: noiseProfile.buffer })}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                
+                                <div className="bg-slate-950/50 rounded-lg p-2 space-y-2 border border-slate-800/50">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Noise Profile</span>
+                                        {noiseProfile.buffer && (
+                                            <button 
+                                                onClick={() => setNoiseProfile({ start: null, end: null, buffer: null })}
+                                                className="text-[10px] text-red-400 hover:text-red-300"
+                                            >
+                                                Clear
+                                            </button>
+                                        )}
+                                    </div>
 
-                            <ToolButton
-                                icon={<Wand2 size={14} />}
-                                label="PsychoDynamic EQ"
-                                onClick={() => runTool('psychodynamic', 'PsychoDynamic EQ', { intensity: 1.0, refDb: -18.0 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                                    {!noiseProfile.buffer ? (
+                                        <div className="space-y-2">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <button 
+                                                    onClick={() => sourceBuffer && setNoiseProfile(prev => ({ ...prev, start: progress * sourceBuffer.duration }))}
+                                                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] text-slate-300 border border-slate-700"
+                                                >
+                                                    Set Start {noiseProfile.start !== null ? `(${noiseProfile.start.toFixed(2)}s)` : ''}
+                                                </button>
+                                                <button 
+                                                    onClick={() => sourceBuffer && setNoiseProfile(prev => ({ ...prev, end: progress * sourceBuffer.duration }))}
+                                                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-[10px] text-slate-300 border border-slate-700"
+                                                >
+                                                    Set End {noiseProfile.end !== null ? `(${noiseProfile.end.toFixed(2)}s)` : ''}
+                                                </button>
+                                            </div>
+                                            
+                                            {noiseProfile.start !== null && noiseProfile.end !== null && (
+                                                <button 
+                                                    onClick={() => {
+                                                        if (!sourceBuffer || noiseProfile.start === null || noiseProfile.end === null) return;
+                                                        const start = Math.min(noiseProfile.start, noiseProfile.end);
+                                                        const end = Math.max(noiseProfile.start, noiseProfile.end);
+                                                        if (end - start < 0.1) {
+                                                            setStatus("Selection too short (<0.1s)");
+                                                            return;
+                                                        }
 
-                            <ToolButton
-                                icon={<Activity size={14} />}
-                                label="Smart Level"
-                                onClick={() => runTool('smartLevel', 'Smart Level', { targetLufs: -16, maxGainDb: 6 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                                                        const sampleRate = sourceBuffer.sampleRate;
+                                                        const startFrame = Math.floor(start * sampleRate);
+                                                        const endFrame = Math.floor(end * sampleRate);
+                                                        const length = endFrame - startFrame;
 
-                            <ToolButton
-                                icon={<Droplets size={14} />}
-                                label="DeBleed Lite"
-                                onClick={() => runTool('debleed', 'DeBleed', { sensitivity: 0.5, threshold: -40 })}
-                                disabled={!sourceBuffer || isProcessing || sourceBuffer.numberOfChannels < 2}
-                            />
+                                                        const buffer = new AudioBuffer({
+                                                            length,
+                                                            numberOfChannels: sourceBuffer.numberOfChannels,
+                                                            sampleRate
+                                                        });
 
-                            <ToolButton
-                                icon={<FastForward size={14} />}
-                                label="Tape Stabilizer"
-                                onClick={() => runTool('tapeStabilizer', 'Tape Fix', { nominalFreq: 60.0, amount: 1.0 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                                                        for(let i=0; i<sourceBuffer.numberOfChannels; i++) {
+                                                            const chan = sourceBuffer.getChannelData(i).subarray(startFrame, endFrame);
+                                                            buffer.copyToChannel(chan, i);
+                                                        }
 
+                                                        setNoiseProfile({ start: null, end: null, buffer });
+                                                        setStatus(`Profile Captured (${(length/sampleRate).toFixed(2)}s)`);
+                                                        setTimeout(() => setStatus(null), 2000);
+                                                    }}
+                                                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold text-white shadow-lg shadow-blue-900/20"
+                                                >
+                                                    Capture Selection
+                                                </button>
+                                            )}
+                                            <div className="text-[10px] text-slate-500 text-center italic">
+                                                {noiseProfile.start !== null ? "Define range..." : "Auto: Uses first 200ms"}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 p-2 bg-blue-900/20 border border-blue-900/30 rounded">
+                                            <Activity size={12} className="text-blue-400" />
+                                            <span className="text-[10px] text-blue-200">
+                                                Manual Profile: {(noiseProfile.buffer.duration).toFixed(2)}s
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Mono Bass */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton 
+                                    icon={<ChevronRight size={14} />} 
+                                    label="Mono Bass" 
+                                    onClick={() => runTool('monoBass', 'Mono Bass', monoBassParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-1 px-1">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                        <span>Cutoff (Hz)</span>
+                                        <span>{monoBassParams.cutoff}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="20" max="500" step="10"
+                                        value={monoBassParams.cutoff}
+                                        onChange={(e) => setMonoBassParams({...monoBassParams, cutoff: parseFloat(e.target.value)})}
+                                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Voice Isolate */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Mic size={14} />}
+                                    label="Voice Isolate"
+                                    onClick={() => runTool('voiceIsolate', 'Voice Isolate', voiceIsolateParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-1 px-1">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                        <span>Amount</span>
+                                        <span>{voiceIsolateParams.amount.toFixed(2)}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0" max="1" step="0.05"
+                                        value={voiceIsolateParams.amount}
+                                        onChange={(e) => setVoiceIsolateParams({...voiceIsolateParams, amount: parseFloat(e.target.value)})}
+                                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* PsychoDynamic EQ */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Wand2 size={14} />}
+                                    label="PsychoDynamic EQ"
+                                    onClick={() => runTool('psychodynamic', 'PsychoDynamic EQ', psychoParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-2 px-1">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Intensity</span>
+                                            <span>{psychoParams.intensity.toFixed(1)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="2" step="0.1"
+                                            value={psychoParams.intensity}
+                                            onChange={(e) => setPsychoParams({...psychoParams, intensity: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Ref dB</span>
+                                            <span>{psychoParams.refDb.toFixed(1)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="-60" max="0" step="1"
+                                            value={psychoParams.refDb}
+                                            onChange={(e) => setPsychoParams({...psychoParams, refDb: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Smart Level with Controls */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Activity size={14} />}
+                                    label="Smart Level"
+                                    onClick={() => runTool('smartLevel', 'Smart Level', smartLevelParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-2 px-1">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Target LUFS</span>
+                                            <span>{smartLevelParams.targetLufs}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="-24" max="-6" step="0.5"
+                                            value={smartLevelParams.targetLufs}
+                                            onChange={(e) => setSmartLevelParams({...smartLevelParams, targetLufs: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Max Gain (dB)</span>
+                                            <span>{smartLevelParams.maxGainDb}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="24" step="0.5"
+                                            value={smartLevelParams.maxGainDb}
+                                            onChange={(e) => setSmartLevelParams({...smartLevelParams, maxGainDb: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Gate (dB)</span>
+                                            <span>{smartLevelParams.gateThresholdDb}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="-100" max="-30" step="1"
+                                            value={smartLevelParams.gateThresholdDb}
+                                            onChange={(e) => setSmartLevelParams({...smartLevelParams, gateThresholdDb: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* DeBleed Lite */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Droplets size={14} />}
+                                    label="DeBleed Lite"
+                                    onClick={() => runTool('debleed', 'DeBleed', debleedParams)}
+                                    disabled={!sourceBuffer || isProcessing || sourceBuffer.numberOfChannels < 2}
+                                />
+                                <div className="space-y-2 px-1">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Sensitivity</span>
+                                            <span>{debleedParams.sensitivity.toFixed(2)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="1" step="0.05"
+                                            value={debleedParams.sensitivity}
+                                            onChange={(e) => setDebleedParams({...debleedParams, sensitivity: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Threshold (dB)</span>
+                                            <span>{debleedParams.threshold}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="-80" max="0" step="1"
+                                            value={debleedParams.threshold}
+                                            onChange={(e) => setDebleedParams({...debleedParams, threshold: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tape Stabilizer */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<FastForward size={14} />}
+                                    label="Tape Stabilizer"
+                                    onClick={() => runTool('tapeStabilizer', 'Tape Fix', tapeParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-2 px-1">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Nominal Freq</span>
+                                            <div className="flex gap-1">
+                                                <button 
+                                                    onClick={() => setTapeParams({...tapeParams, nominalFreq: 50})}
+                                                    className={`px-2 py-0.5 rounded text-[10px] ${tapeParams.nominalFreq === 50 ? 'bg-blue-600 text-white' : 'bg-slate-700'}`}
+                                                >50Hz</button>
+                                                <button 
+                                                    onClick={() => setTapeParams({...tapeParams, nominalFreq: 60})}
+                                                    className={`px-2 py-0.5 rounded text-[10px] ${tapeParams.nominalFreq === 60 ? 'bg-blue-600 text-white' : 'bg-slate-700'}`}
+                                                >60Hz</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Amount</span>
+                                            <span>{tapeParams.amount.toFixed(2)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="1" step="0.05"
+                                            value={tapeParams.amount}
+                                            onChange={(e) => setTapeParams({...tapeParams, amount: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Spectral Match */}
                             <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
                                 <ToolButton
                                     icon={<Target size={14} />}
                                     label="Spectral Match"
-                                    onClick={() => runTool('spectralMatch', 'Match', { referenceBuffer, amount: 1.0 })}
+                                    onClick={() => runTool('spectralMatch', 'Match', { referenceBuffer, ...spectralMatchParams })}
                                     disabled={!sourceBuffer || isProcessing || !referenceBuffer}
                                 />
+                                <div className="space-y-1 px-1">
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                        <span>Match Amount</span>
+                                        <span>{spectralMatchParams.amount.toFixed(2)}</span>
+                                    </div>
+                                    <input
+                                        type="range" min="0" max="1" step="0.05"
+                                        value={spectralMatchParams.amount}
+                                        onChange={(e) => setSpectralMatchParams({...spectralMatchParams, amount: parseFloat(e.target.value)})}
+                                        className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    />
+                                </div>
                                 <button 
                                     onClick={() => refInputRef.current?.click()}
                                     className="w-full text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 py-1.5 rounded-lg border border-slate-700 transition-colors"
@@ -331,12 +705,41 @@ export const SmartToolsWorkspace: React.FC = () => {
                                 <input type="file" ref={refInputRef} onChange={handleRefUpload} accept="audio/*" className="hidden" />
                             </div>
 
-                            <ToolButton
-                                icon={<Wind size={14} />}
-                                label="Echo Vanish"
-                                onClick={() => runTool('echovanish', 'De-Reverb', { amount: 1.0, tailMs: 100 })}
-                                disabled={!sourceBuffer || isProcessing}
-                            />
+                            {/* Echo Vanish with Controls */}
+                            <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
+                                <ToolButton
+                                    icon={<Wind size={14} />}
+                                    label="Echo Vanish"
+                                    onClick={() => runTool('echovanish', 'De-Reverb', echoParams)}
+                                    disabled={!sourceBuffer || isProcessing}
+                                />
+                                <div className="space-y-2 px-1">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Amount</span>
+                                            <span>{echoParams.amount.toFixed(2)}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="0" max="1" step="0.01"
+                                            value={echoParams.amount}
+                                            onChange={(e) => setEchoParams({...echoParams, amount: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                            <span>Tail (ms)</span>
+                                            <span>{echoParams.tailMs}</span>
+                                        </div>
+                                        <input
+                                            type="range" min="10" max="2000" step="10"
+                                            value={echoParams.tailMs}
+                                            onChange={(e) => setEchoParams({...echoParams, tailMs: parseFloat(e.target.value)})}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
                             {/* Plosive Guard */}
                             <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">

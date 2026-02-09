@@ -115,9 +115,8 @@ export fn process_phase_rotation(ptr: [*]f32, len: usize) void {
 
 // --- 3. De-Clipper ---
 
-export fn process_declip(ptr: [*]f32, len: usize) void {
+export fn process_declip(ptr: [*]f32, len: usize, threshold: f32) void {
     const data = ptr[0..len];
-    const threshold: f32 = 0.999;
     var i: usize = 0;
     while (i < len) {
         if (@abs(data[i]) >= threshold) {
@@ -147,47 +146,99 @@ export fn process_declip(ptr: [*]f32, len: usize) void {
 
 // --- 4. Adaptive Spectral Denoise ---
 
-export fn process_spectral_denoise(ptr: [*]f32, len: usize) void {
+export fn process_spectral_denoise(ptr: [*]f32, len: usize, noise_ptr: [*]f32, noise_len: usize) void {
     const data = ptr[0..len];
     const window_size = 2048;
     const hop_size = window_size / 2;
+    
+    // Allocate buffers
     const fft_buf = allocator.alloc(math.Complex, window_size) catch return;
     defer allocator.free(fft_buf);
+    
     const noise_profile = allocator.alloc(f32, window_size / 2) catch return;
     defer allocator.free(noise_profile);
     @memset(noise_profile, 0);
-    const noise_frames = 5;
-    var frames_processed: usize = 0;
-    const output_buf = allocator.alloc(f32, len) catch return;
-    defer allocator.free(output_buf);
-    @memset(output_buf, 0);
+
     const window = allocator.alloc(f32, window_size) catch return;
     defer allocator.free(window);
+    // Hanning Window
     for (window, 0..) |_, idx| {
         window[idx] = 0.5 * (1.0 - std.math.cos(math.TWO_PI * @as(f32, @floatFromInt(idx)) / @as(f32, @floatFromInt(window_size - 1))));
     }
+
+    // 1. Build Noise Profile
+    var profile_ready: bool = false;
+
+    if (noise_len > 0 and noise_ptr != ptr) { // Explicit profile provided
+        const noise_data = noise_ptr[0..noise_len];
+        var pos: usize = 0;
+        var frames_counted: usize = 0;
+
+        while (pos + window_size < noise_len) : (pos += hop_size) {
+             for (0..window_size) |k| {
+                fft_buf[k] = .{ .re = noise_data[pos + k] * window[k], .im = 0 };
+            }
+            math.fft_iterative(fft_buf, false);
+            
+            for (0..window_size/2) |k| {
+                noise_profile[k] += fft_buf[k].magnitude();
+            }
+            frames_counted += 1;
+        }
+
+        if (frames_counted > 0) {
+            for (0..window_size/2) |k| {
+                noise_profile[k] /= @as(f32, @floatFromInt(frames_counted));
+            }
+            profile_ready = true;
+        }
+    }
+
+    // 2. Process Audio
+    const output_buf = allocator.alloc(f32, len) catch return;
+    defer allocator.free(output_buf);
+    @memset(output_buf, 0);
+
+    const noise_frames_auto = 5;
+    var frames_processed: usize = 0;
+    
     var pos: usize = 0;
     while (pos + window_size < len) : (pos += hop_size) {
         for (0..window_size) |k| {
             fft_buf[k] = .{ .re = data[pos + k] * window[k], .im = 0 };
         }
         math.fft_iterative(fft_buf, false);
-        if (frames_processed < noise_frames) {
+
+        // Auto-learn if no profile provided
+        if (!profile_ready and frames_processed < noise_frames_auto) {
             for (0..window_size/2) |k| {
                 noise_profile[k] += fft_buf[k].magnitude();
             }
-            if (frames_processed == noise_frames - 1) {
+            if (frames_processed == noise_frames_auto - 1) {
                 for (0..window_size/2) |k| {
-                    noise_profile[k] /= @as(f32, @floatFromInt(noise_frames));
+                    noise_profile[k] /= @as(f32, @floatFromInt(noise_frames_auto));
                 }
+                // Don't set profile_ready=true because we want to continue this block logic 
+                // actually we can just transition to processing.
+                // But in the original code, the first 5 frames are passed through UNPROCESSED (or just windowed/reconstructed).
+                // Let's stick to original behavior for auto mode: first 5 frames are essentially "silence" or passed through?
+                // Original code: if frames < noise_frames, it accumulates. ELSE it subtracts.
+                // This means the first 5 frames are reconstructed WITHOUT subtraction.
             }
             frames_processed += 1;
+            
+            // Pass through (reconstruct without modification)
+            math.fft_iterative(fft_buf, true);
         } else {
+            // Apply Denoise
             for (0..window_size/2) |k| {
                 const mag = fft_buf[k].magnitude();
                 const phase = std.math.atan2(fft_buf[k].im, fft_buf[k].re);
-                var new_mag = mag - noise_profile[k] * 1.5;
+                
+                // Spectral Subtraction
+                var new_mag = mag - noise_profile[k] * 1.5; // 1.5 is subtraction factor
                 if (new_mag < 0) new_mag = 0;
+                
                 fft_buf[k] = .{ 
                     .re = new_mag * std.math.cos(phase),
                     .im = new_mag * std.math.sin(phase) 
@@ -196,8 +247,10 @@ export fn process_spectral_denoise(ptr: [*]f32, len: usize) void {
                      fft_buf[window_size - k] = .{ .re = fft_buf[k].re, .im = -fft_buf[k].im };
                 }
             }
+            math.fft_iterative(fft_buf, true);
         }
-        math.fft_iterative(fft_buf, true);
+
+        // Overlap-Add
         for (0..window_size) |k| {
             output_buf[pos + k] += fft_buf[k].re * window[k];
         }

@@ -54,9 +54,9 @@ export class SonicForgeSDK {
     }
   }
 
-  processDeclip(channelData: Float32Array): Float32Array {
+  processDeclip(channelData: Float32Array, threshold: number): Float32Array {
     const { process_declip } = this.wasmInstance!.exports as any;
-    return this.processBuffer(channelData, process_declip);
+    return this.processBuffer(channelData, (ptr, len) => process_declip(ptr, len, threshold));
   }
 
   processLufsNormalize(channelData: Float32Array, targetLufs: number): Float32Array {
@@ -69,9 +69,39 @@ export class SonicForgeSDK {
     return this.processBuffer(channelData, process_phase_rotation);
   }
 
-  processSpectralDenoise(channelData: Float32Array): Float32Array {
-    const { process_spectral_denoise } = this.wasmInstance!.exports as any;
-    return this.processBuffer(channelData, process_spectral_denoise);
+  processSpectralDenoise(channelData: Float32Array, noiseProfile?: Float32Array): Float32Array {
+    if (!this.wasmInstance || !this.memory) {
+      throw new Error('SDK not initialized. Call init() first.');
+    }
+    const { alloc, free, process_spectral_denoise } = this.wasmInstance.exports as any;
+
+    const len = channelData.length;
+    const ptr = alloc(len);
+    
+    // Optional Noise Profile
+    let noisePtr = 0;
+    const noiseLen = noiseProfile ? noiseProfile.length : 0;
+    if (noiseProfile && noiseLen > 0) {
+        noisePtr = alloc(noiseLen);
+        new Float32Array(this.memory.buffer, noisePtr, noiseLen).set(noiseProfile);
+    }
+
+    try {
+      // Copy target data
+      new Float32Array(this.memory.buffer, ptr, len).set(channelData);
+
+      // Process
+      process_spectral_denoise(ptr, len, noisePtr, noiseLen);
+
+      // Read back result
+      const outputView = new Float32Array(this.memory.buffer, ptr, len);
+      return new Float32Array(outputView);
+    } finally {
+      free(ptr, len);
+      if (noisePtr) {
+        free(noisePtr, noiseLen);
+      }
+    }
   }
 
   processMonoBass(channelData: Float32Array, sampleRate: number, cutoffFreq: number): Float32Array {
