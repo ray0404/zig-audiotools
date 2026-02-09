@@ -1,4 +1,5 @@
 import { SonicForgeSDK } from '@sonic-core/sdk.js';
+import { AudioAnalysis } from '@sonic-core/types.js';
 
 let sdk: SonicForgeSDK | null = null;
 
@@ -166,4 +167,52 @@ export async function processAudioBuffer(
     }
 
     return newBuffer;
+}
+
+export async function analyzeBuffer(audioBuffer: AudioBuffer): Promise<AudioAnalysis> {
+    const sdk = getProcessorSDK();
+    const numChannels = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Interleave
+    const len = audioBuffer.length * numChannels;
+    const interleaved = new Float32Array(len);
+    
+    if (numChannels === 1) {
+        interleaved.set(audioBuffer.getChannelData(0));
+    } else {
+        const l = audioBuffer.getChannelData(0);
+        const r = audioBuffer.getChannelData(1);
+        for (let i = 0; i < audioBuffer.length; i++) {
+            interleaved[i * 2] = l[i];
+            interleaved[i * 2 + 1] = r[i];
+        }
+    }
+
+    const res = sdk.analyzeAudio(interleaved, numChannels, sampleRate);
+    
+    return {
+        loudness: {
+            integrated: res[0],
+            range: res[1],
+            momentaryMax: res[12],
+            shortTermMax: res[13],
+        },
+        dynamics: {
+            truePeak: res[2],
+            rms: res[3],
+            crestFactor: res[4],
+        },
+        stereo: {
+            correlation: res[5],
+            width: res[6],
+            balance: res[7],
+        },
+        spectral: {
+            dcOffset: res[8],
+            low: res[9],
+            mid: res[10],
+            high: res[11],
+        }
+    };
 }

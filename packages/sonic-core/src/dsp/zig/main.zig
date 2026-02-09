@@ -366,3 +366,284 @@ export fn process_debleed(ptr_target: [*]f32, ptr_source: [*]f32, len: usize, se
 export fn process_echovanish(ptr: [*]f32, len: usize, sample_rate: f32, reduction_amount: f32, tail_length_ms: f32) void {
     echovanish.process_echovanish(ptr, len, sample_rate, reduction_amount, tail_length_ms);
 }
+
+// --- 6. Advanced Audio Analysis Engine ---
+
+const AnalysisStats = struct {
+    lufs_integrated: f32,
+    lufs_short_term_max: f32,
+    lufs_momentary_max: f32,
+    lra: f32,              // Loudness Range (Macrodynamics)
+    true_peak: f32,        // Inter-sample peak approximation
+    rms_db: f32,
+    crest_factor: f32,     // Microdynamics (Peak - RMS)
+    correlation: f32,      // Phase coherence
+    stereo_width: f32,     // Side / Mid ratio
+    balance: f32,          // L vs R energy (-1.0 to 1.0)
+    dc_offset: f32,
+    spec_low: f32,         // Bass energy (<250Hz)
+    spec_mid: f32,         // Mid energy (250Hz - 4kHz)
+    spec_high: f32,        // High energy (>4kHz)
+};
+
+// Simple IIR Filter for analysis (Low/High Pass)
+const IIRFilter = struct {
+    x1: f32 = 0, y1: f32 = 0,
+    a1: f32 = 0, b0: f32 = 0, b1: f32 = 0,
+
+    fn init_lp(fc: f32, fs: f32) IIRFilter {
+        // Simple 1-pole Lowpass
+        const w = 2.0 * std.math.pi * fc / fs;
+        const t = 1.0 / (1.0 + w);
+        return .{ .a1 = -(1.0 - w) * t, .b0 = w * t, .b1 = w * t }; 
+    }
+};
+
+// K-Weighting Filter Chain (Stage 1: High Shelf, Stage 2: HPF)
+const KWeighting = struct {
+    // Stage 1: High Shelf 4dB gain @ ~1.5kHz
+    hs_x1: f32 = 0, hs_x2: f32 = 0, hs_y1: f32 = 0, hs_y2: f32 = 0,
+    // Stage 2: HPF @ ~38Hz
+    hp_x1: f32 = 0, hp_x2: f32 = 0, hp_y1: f32 = 0, hp_y2: f32 = 0,
+
+    fn process(self: *KWeighting, input: f32) f32 {
+        // Coefficients for 48kHz (Standard EBU R128)
+        // High Shelf
+        const b0_hs = 1.53512485958697; const b1_hs = -2.69169618940638; const b2_hs = 1.19839281085285;
+        const a1_hs = -1.69065929318241; const a2_hs = 0.73248077421585;
+        
+        var out = b0_hs * input + b1_hs * self.hs_x1 + b2_hs * self.hs_x2 - a1_hs * self.hs_y1 - a2_hs * self.hs_y2;
+        self.hs_x2 = self.hs_x1; self.hs_x1 = input;
+        self.hs_y2 = self.hs_y1; self.hs_y1 = out;
+        
+        const stage1 = out;
+
+        // High Pass
+        const b0_hp = 1.0; const b1_hp = -2.0; const b2_hp = 1.0;
+        const a1_hp = -1.99004745483398; const a2_hp = 0.99007225036621;
+
+        out = b0_hp * stage1 + b1_hp * self.hp_x1 + b2_hp * self.hp_x2 - a1_hp * self.hp_y1 - a2_hp * self.hp_y2;
+        self.hp_x2 = self.hp_x1; self.hp_x1 = stage1;
+        self.hp_y2 = self.hp_y1; self.hp_y1 = out;
+
+        return out;
+    }
+};
+
+export fn analyze_audio_comprehensive(ptr: [*]f32, len: usize, channels: i32, sample_rate: f32, out_ptr: [*]f32) void {
+    const data = ptr[0..len];
+    const chan_count: usize = if (channels >= 2) 2 else 1;
+    const step = chan_count;
+
+    // 1. Setup Metrics
+    var k_filter_l = KWeighting{};
+    var k_filter_r = KWeighting{};
+    
+    // Spectral Crossovers (Simple 1-pole for energy estimation)
+    // Low < 250Hz
+    const alpha_low = 1.0 - std.math.exp(-2.0 * std.math.pi * 250.0 / sample_rate);
+    // High > 4000Hz
+    const alpha_high = 1.0 - std.math.exp(-2.0 * std.math.pi * 4000.0 / sample_rate);
+    
+    var low_l: f32 = 0; var low_r: f32 = 0;
+    var high_l: f32 = 0; var high_r: f32 = 0;
+
+    // Accumulators
+    var sum_sq_weighted: f64 = 0;
+    var sum_sq_raw: f64 = 0;
+    var peak_raw: f32 = 0;
+    var sum_l_sq: f64 = 0; var sum_r_sq: f64 = 0; var sum_lr: f64 = 0; // Correlation
+    var sum_mid_sq: f64 = 0; var sum_side_sq: f64 = 0; // Width
+    var sum_dc_l: f64 = 0; var sum_dc_r: f64 = 0;
+
+    var sum_energy_low: f64 = 0;
+    var sum_energy_mid: f64 = 0;
+    var sum_energy_high: f64 = 0;
+
+    // LRA & Short Term Buffers
+    const hop_size: usize = @intFromFloat(sample_rate * 0.1); 
+    const max_blocks = 6000; 
+    const st_history = allocator.alloc(f32, max_blocks) catch return;
+    defer allocator.free(st_history);
+    var st_count: usize = 0;
+
+    const st_hops = 30;
+    const mom_history = allocator.alloc(f32, st_hops) catch return;
+    defer allocator.free(mom_history);
+    @memset(mom_history, 0);
+    var mom_idx: usize = 0;
+
+    var current_hop_samples: usize = 0;
+    var hop_energy_sum: f64 = 0;
+
+    var max_momentary: f32 = -100.0;
+    var max_short_term: f32 = -100.0;
+
+    var i: usize = 0;
+    while (i < len) : (i += @intCast(step)) {
+        const l = data[i];
+        const r = if (chan_count == 2) data[i+1] else l;
+
+        const abs_l = @abs(l);
+        const abs_r = @abs(r);
+        
+        if (abs_l > peak_raw) peak_raw = abs_l;
+        if (abs_r > peak_raw) peak_raw = abs_r;
+
+        // --- RMS ---
+        const sq = (l*l + r*r) / @as(f32, @floatFromInt(chan_count));
+        sum_sq_raw += sq;
+
+        // --- DC Offset ---
+        sum_dc_l += l;
+        sum_dc_r += r;
+
+        // --- K-Weighting for Loudness ---
+        const kw_l = k_filter_l.process(l);
+        const kw_r = k_filter_r.process(r);
+        const energy_weighted = kw_l * kw_l + kw_r * kw_r; 
+        sum_sq_weighted += energy_weighted;
+        
+        // --- LRA / Short Term Accumulation ---
+        hop_energy_sum += energy_weighted;
+        current_hop_samples += 1;
+
+        if (current_hop_samples >= hop_size) {
+            const hop_mean = hop_energy_sum / @as(f64, @floatFromInt(current_hop_samples));
+            
+            mom_history[mom_idx] = @as(f32, @floatCast(hop_mean));
+            mom_idx = (mom_idx + 1) % st_hops;
+
+            var st_sum: f32 = 0;
+            for (mom_history) |val| st_sum += val;
+            const st_mean = st_sum / @as(f32, @floatFromInt(st_hops));
+            
+            if (st_count < max_blocks) {
+                const st_lufs = if (st_mean > 1e-10) -0.691 + 10.0 * std.math.log10(st_mean) else -100.0;
+                st_history[st_count] = st_lufs;
+                st_count += 1;
+                if (st_lufs > max_short_term) max_short_term = st_lufs;
+            }
+
+            var mom_400_sum: f32 = 0;
+            for (0..4) |back| {
+                 const idx = (mom_idx + st_hops - 1 - back) % st_hops;
+                 mom_400_sum += mom_history[idx];
+            }
+            const mom_400_mean = mom_400_sum / 4.0;
+            const mom_lufs = if (mom_400_mean > 1e-10) -0.691 + 10.0 * std.math.log10(mom_400_mean) else -100.0;
+            if (mom_lufs > max_momentary) max_momentary = mom_lufs;
+
+            hop_energy_sum = 0;
+            current_hop_samples = 0;
+        }
+
+        // --- Stereo Stats ---
+        if (chan_count == 2) {
+            sum_l_sq += l * l;
+            sum_r_sq += r * r;
+            sum_lr += l * r;
+            
+            const mid = (l + r) * 0.5;
+            const side = (l - r) * 0.5;
+            sum_mid_sq += mid * mid;
+            sum_side_sq += side * side;
+        }
+
+        // --- Spectral Balance (Simple 3-band) ---
+        low_l += alpha_low * (l - low_l);
+        low_r += alpha_low * (r - low_r);
+        const bass_energy = (low_l*low_l + low_r*low_r);
+        sum_energy_low += bass_energy;
+
+        high_l += alpha_high * (l - high_l); 
+        high_r += alpha_high * (r - high_r);
+        const h_l = l - high_l; 
+        const h_r = r - high_r;
+        const high_energy = (h_l*h_l + h_r*h_r);
+        sum_energy_high += high_energy;
+    }
+    
+    sum_energy_mid = sum_sq_raw - sum_energy_low - sum_energy_high;
+    if (sum_energy_mid < 0) sum_energy_mid = 0;
+
+    const total_samples = @as(f64, @floatFromInt(len)) / @as(f64, @floatFromInt(step));
+
+    // --- Final Calculations ---
+
+    const lufs_int = -0.691 + 10.0 * std.math.log10((sum_sq_weighted / total_samples) + 1e-10);
+
+    const abs_gate = -70.0;
+    const rel_gate = lufs_int - 20.0;
+    const gate_threshold = if (rel_gate > abs_gate) rel_gate else abs_gate;
+    
+    var valid_blocks = allocator.alloc(f32, st_count) catch return;
+    defer allocator.free(valid_blocks);
+    var valid_count: usize = 0;
+    
+    for (st_history[0..st_count]) |val| {
+        if (val > gate_threshold) {
+            valid_blocks[valid_count] = val;
+            valid_count += 1;
+        }
+    }
+    
+    var lra: f32 = 0.0;
+    if (valid_count > 1) {
+        const slice = valid_blocks[0..valid_count];
+        std.sort.block(f32, slice, {}, std.sort.asc(f32));
+        
+        const idx_10 = @as(usize, @intFromFloat(@as(f32, @floatFromInt(valid_count)) * 0.10));
+        const idx_95 = @as(usize, @intFromFloat(@as(f32, @floatFromInt(valid_count)) * 0.95));
+        const p10 = slice[if (idx_10 < valid_count) idx_10 else valid_count-1];
+        const p95 = slice[if (idx_95 < valid_count) idx_95 else valid_count-1];
+        lra = p95 - p10;
+    }
+
+    const rms_val = std.math.sqrt(sum_sq_raw / total_samples);
+    const rms_db = 20.0 * std.math.log10(rms_val + 1e-10);
+    const peak_db = 20.0 * std.math.log10(peak_raw + 1e-10);
+    const crest = peak_db - rms_db;
+
+    var correlation: f32 = 0.0;
+    if (sum_l_sq * sum_r_sq > 0) {
+        correlation = @floatCast(sum_lr / std.math.sqrt(sum_l_sq * sum_r_sq));
+    } else {
+        correlation = 1.0; 
+    }
+
+    var width: f32 = 0.0;
+    if (sum_mid_sq + sum_side_sq > 0) {
+        width = @floatCast(sum_side_sq / (sum_mid_sq + sum_side_sq)); 
+    }
+
+    var balance: f32 = 0.0;
+    if (sum_l_sq + sum_r_sq > 0) {
+        balance = @floatCast((sum_r_sq - sum_l_sq) / (sum_r_sq + sum_l_sq));
+    }
+
+    const total_spec = sum_energy_low + sum_energy_mid + sum_energy_high + 1e-10;
+    const spec_l = @as(f32, @floatCast(sum_energy_low / total_spec));
+    const spec_m = @as(f32, @floatCast(sum_energy_mid / total_spec));
+    const spec_h = @as(f32, @floatCast(sum_energy_high / total_spec));
+    
+    const dc_l = sum_dc_l / total_samples;
+    const dc_r = sum_dc_r / total_samples;
+    const dc_max = @max(@abs(dc_l), @abs(dc_r));
+
+    out_ptr[0] = @floatCast(lufs_int);
+    out_ptr[1] = lra;
+    out_ptr[2] = @floatCast(peak_db);
+    out_ptr[3] = @floatCast(rms_db);
+    out_ptr[4] = @floatCast(crest);
+    out_ptr[5] = correlation;
+    out_ptr[6] = width;
+    out_ptr[7] = balance;
+    out_ptr[8] = @floatCast(dc_max);
+    out_ptr[9] = spec_l;
+    out_ptr[10] = spec_m;
+    out_ptr[11] = spec_h;
+    out_ptr[12] = max_momentary;
+    out_ptr[13] = max_short_term;
+}
+

@@ -6,12 +6,15 @@ import {
     Loader2, Upload, 
     Play, Square, Download, Trash2, Wand2,
     Settings2, ChevronRight, Mic, Activity, Droplets, FastForward,
-    Target, Wind
+    Target, Wind, SkipBack, BarChart3, Waves
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { ResponsiveCanvas } from '@/components/visualizers/ResponsiveCanvas';
+import { useUIStore } from '@/store/useUIStore';
+import { AnalysisView } from '@/components/views/AnalysisView';
 
 export const SmartToolsWorkspace: React.FC = () => {
+    const { activeView, setActiveView } = useUIStore();
     const [, setIsSdkReady] = useState(false);
     const [sourceBuffer, setSourceBuffer] = useState<AudioBuffer | null>(null);
     const [processedBuffer, setProcessedBuffer] = useState<AudioBuffer | null>(null);
@@ -57,6 +60,9 @@ export const SmartToolsWorkspace: React.FC = () => {
     // Refs for waveform rendering
     const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const processedCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    
+    // Ref for seeking
+    const isDraggingRef = useRef(false);
 
     useEffect(() => {
         initProcessor().then(() => setIsSdkReady(true));
@@ -99,12 +105,10 @@ export const SmartToolsWorkspace: React.FC = () => {
             setProcessedBuffer(history[newIndex]);
             if (isPlaying && playbackMode === 'processed') {
                 stopPlayback(); // Stop to avoid glitch
+                // Ideally restart playback at current position with new buffer
+                const buffer = history[newIndex];
+                startPlayback(buffer, progress * buffer.duration);
             }
-        } else if (historyIndex === 0) {
-             // Undo back to source state if needed, or just keep index 0
-             // Ideally index 0 is the first processed state. 
-             // Let's handle 'Source' as distinct from history? 
-             // Actually, if we want to undo 'back to original', we can treat source as initial history
         }
     };
 
@@ -115,6 +119,8 @@ export const SmartToolsWorkspace: React.FC = () => {
             setProcessedBuffer(history[newIndex]);
             if (isPlaying && playbackMode === 'processed') {
                 stopPlayback();
+                const buffer = history[newIndex];
+                startPlayback(buffer, progress * buffer.duration);
             }
         }
     };
@@ -224,10 +230,11 @@ export const SmartToolsWorkspace: React.FC = () => {
         
         const startTime = audioContextRef.current.currentTime;
         const duration = buffer.duration;
-        const startOffset = offset % duration;
+        // Clamp offset
+        const safeOffset = Math.max(0, Math.min(offset, duration - 0.01));
         
-        source.start(0, startOffset);
-        startTimeRef.current = startTime - startOffset;
+        source.start(0, safeOffset);
+        startTimeRef.current = startTime - safeOffset;
         
         sourceNodeRef.current = source;
         setIsPlaying(true);
@@ -239,10 +246,16 @@ export const SmartToolsWorkspace: React.FC = () => {
         
         const now = audioContextRef.current.currentTime;
         const elapsed = now - startTimeRef.current;
-        const p = (elapsed / activeBuffer.duration) % 1;
+        const p = Math.max(0, Math.min(1, elapsed / activeBuffer.duration));
         
         setProgress(p);
-        animationFrameRef.current = requestAnimationFrame(() => updateProgress(activeBuffer));
+        
+        if (p >= 1) {
+             stopPlayback();
+             setProgress(1);
+        } else {
+             animationFrameRef.current = requestAnimationFrame(() => updateProgress(activeBuffer));
+        }
     };
 
     const togglePlay = () => {
@@ -250,8 +263,53 @@ export const SmartToolsWorkspace: React.FC = () => {
             stopPlayback();
         } else {
             const buffer = playbackMode === 'source' ? sourceBuffer : processedBuffer;
-            if (buffer) startPlayback(buffer, progress * buffer.duration);
+            if (buffer) {
+                // If at end, restart
+                const startPos = progress >= 1 ? 0 : progress * buffer.duration;
+                startPlayback(buffer, startPos);
+            }
         }
+    };
+
+    const handleSeek = (e: React.MouseEvent | React.TouchEvent, container: HTMLDivElement) => {
+        if (!sourceBuffer) return;
+        
+        const rect = container.getBoundingClientRect();
+        let clientX;
+        
+        if ('touches' in e) {
+            clientX = e.touches[0].clientX;
+        } else {
+            clientX = (e as React.MouseEvent).clientX;
+        }
+        
+        const x = clientX - rect.left;
+        const newProgress = Math.max(0, Math.min(1, x / rect.width));
+        
+        setProgress(newProgress);
+        
+        // If playing, seek immediately
+        if (isPlaying) {
+            const buffer = playbackMode === 'source' ? sourceBuffer : processedBuffer;
+            if (buffer) startPlayback(buffer, newProgress * buffer.duration);
+        }
+    };
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+        isDraggingRef.current = true;
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        handleSeek(e, e.currentTarget);
+    };
+    
+    const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+        if (isDraggingRef.current) {
+            handleSeek(e, e.currentTarget);
+        }
+    };
+
+    const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+        isDraggingRef.current = false;
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     };
 
     const runTool = async (tool: any, label: string, params?: any) => {
@@ -280,15 +338,16 @@ export const SmartToolsWorkspace: React.FC = () => {
     return (
         <div className="flex flex-col h-screen bg-slate-950 text-slate-200 overflow-hidden font-sans">
             {/* Header */}
-            <header className="h-14 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur-md shrink-0">
+            <header className="h-14 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 bg-slate-900/50 backdrop-blur-md shrink-0 z-10">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
                         <Wand2 size={18} className="text-white" />
                     </div>
-                    <h1 className="font-bold tracking-tight text-lg">Sonic Forge <span className="text-blue-500">SmartTools</span></h1>
+                    <h1 className="font-bold tracking-tight text-lg hidden md:block">Sonic Forge <span className="text-blue-500">SmartTools</span></h1>
+                    <h1 className="font-bold tracking-tight text-lg md:hidden">SF <span className="text-blue-500">Tools</span></h1>
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 md:gap-4">
                     {/* Undo/Redo Controls */}
                     <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
                         <button 
@@ -310,28 +369,52 @@ export const SmartToolsWorkspace: React.FC = () => {
                     </div>
 
                     {status && (
-                        <div className="text-xs font-mono text-blue-400 animate-pulse flex items-center gap-2 bg-blue-950/30 px-3 py-1.5 rounded-full border border-blue-900/30">
+                        <div className="hidden md:flex text-xs font-mono text-blue-400 animate-pulse items-center gap-2 bg-blue-950/30 px-3 py-1.5 rounded-full border border-blue-900/30">
                             {isProcessing && <Loader2 size={12} className="animate-spin" />}
                             {status}
                         </div>
                     )}
                     <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-slate-700"
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 md:px-4 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-slate-700"
                     >
                         <Upload size={14} />
-                        {sourceBuffer ? 'Change File' : 'Open Audio'}
+                        <span className="hidden md:inline">{sourceBuffer ? 'Change File' : 'Open Audio'}</span>
                     </button>
                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="audio/*" className="hidden" />
                 </div>
             </header>
 
-            <main className="flex-1 flex overflow-hidden">
+            <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
                 {/* Tools Sidebar */}
-                <aside className="w-72 border-r border-slate-800 bg-slate-900/30 p-4 flex flex-col gap-6">
+                <aside className="order-2 md:order-1 w-full md:w-72 border-t md:border-t-0 md:border-r border-slate-800 bg-slate-900/30 p-4 flex flex-col gap-6 overflow-y-auto shrink-0 h-1/2 md:h-auto">
                     <section>
+                         <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Views</h2>
+                         <div className="flex gap-2 mb-6 bg-slate-900/50 p-1 rounded-xl border border-slate-800">
+                            <button 
+                                onClick={() => setActiveView('TOOLS')}
+                                className={clsx(
+                                    "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all",
+                                    activeView === 'TOOLS' || activeView === 'SETTINGS' ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+                                )}
+                            >
+                                <Waves size={14} />
+                                Editor
+                            </button>
+                            <button 
+                                onClick={() => setActiveView('ANALYSIS')}
+                                className={clsx(
+                                    "flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all",
+                                    activeView === 'ANALYSIS' ? "bg-blue-600 text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+                                )}
+                            >
+                                <BarChart3 size={14} />
+                                Analysis
+                            </button>
+                         </div>
+
                         <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Processors</h2>
-                        <div className="space-y-2 overflow-y-auto pr-2 max-h-[calc(100vh-250px)]">
+                        <div className="space-y-2 pb-20 md:pb-0">
                             {/* Loudness Normalize */}
                             <div className="bg-slate-900/30 rounded-xl border border-slate-800 p-3 space-y-3">
                                 <ToolButton 
@@ -794,7 +877,7 @@ export const SmartToolsWorkspace: React.FC = () => {
                     </section>
 
                     {sourceBuffer && (
-                        <section className="mt-auto pt-6 border-t border-slate-800 space-y-3">
+                        <section className="mt-auto pt-6 border-t border-slate-800 space-y-3 mb-24 md:mb-0">
                             <button 
                                 onClick={() => {
                                     const wav = audioBufferToWav(processedBuffer!, { bitDepth: 24 });
@@ -822,8 +905,11 @@ export const SmartToolsWorkspace: React.FC = () => {
                 </aside>
 
                 {/* Content Area */}
-                <section className="flex-1 flex flex-col bg-slate-950 relative">
-                    {!sourceBuffer ? (
+                <section className="order-1 md:order-2 flex-1 flex flex-col bg-slate-950 relative h-1/2 md:h-auto overflow-hidden">
+                    {activeView === 'ANALYSIS' ? (
+                        <AnalysisView sourceBuffer={sourceBuffer} processedBuffer={processedBuffer || sourceBuffer} />
+                    ) : (
+                        !sourceBuffer ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-slate-500 gap-4">
                             <div className="w-20 h-20 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-2">
                                 <Upload size={32} className="text-slate-700" />
@@ -835,15 +921,21 @@ export const SmartToolsWorkspace: React.FC = () => {
                         </div>
                     ) : (
                         <>
-                            <div className="flex-1 flex flex-col p-6 gap-6 overflow-y-auto">
+                            <div className="flex-1 flex flex-col p-4 md:p-6 gap-4 md:gap-6 overflow-y-auto">
                                 {/* Waveform Compare */}
                                 <div className="flex-1 flex flex-col gap-4">
-                                    <div className="flex-1 bg-slate-900/50 rounded-2xl border border-slate-800 p-4 flex flex-col gap-2">
+                                    <div className="flex-1 bg-slate-900/50 rounded-2xl border border-slate-800 p-2 md:p-4 flex flex-col gap-2 relative">
                                         <div className="flex items-center justify-between px-2">
                                             <span className="text-[10px] font-bold text-slate-500 uppercase">Original Source</span>
                                             {playbackMode === 'source' && isPlaying && <span className="text-[10px] text-blue-500 font-bold animate-pulse">Monitoring</span>}
                                         </div>
-                                        <div className="flex-1 relative rounded-xl overflow-hidden bg-slate-950/50 border border-slate-800/50">
+                                        <div 
+                                            className="flex-1 relative rounded-xl overflow-hidden bg-slate-950/50 border border-slate-800/50 cursor-crosshair touch-none"
+                                            onPointerDown={handlePointerDown}
+                                            onPointerMove={handlePointerMove}
+                                            onPointerUp={handlePointerUp}
+                                            onPointerLeave={handlePointerUp}
+                                        >
                                             <ResponsiveCanvas 
                                                 onMount={(c) => { 
                                                     sourceCanvasRef.current = c; 
@@ -860,12 +952,18 @@ export const SmartToolsWorkspace: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 bg-slate-900/50 rounded-2xl border border-slate-800 p-4 flex flex-col gap-2">
+                                    <div className="flex-1 bg-slate-900/50 rounded-2xl border border-slate-800 p-2 md:p-4 flex flex-col gap-2 relative">
                                         <div className="flex items-center justify-between px-2">
                                             <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Processed Result</span>
                                             {playbackMode === 'processed' && isPlaying && <span className="text-[10px] text-blue-500 font-bold animate-pulse">Monitoring</span>}
                                         </div>
-                                        <div className="flex-1 relative rounded-xl overflow-hidden bg-slate-950/50 border border-slate-800/50">
+                                        <div 
+                                            className="flex-1 relative rounded-xl overflow-hidden bg-slate-950/50 border border-slate-800/50 cursor-crosshair touch-none"
+                                            onPointerDown={handlePointerDown}
+                                            onPointerMove={handlePointerMove}
+                                            onPointerUp={handlePointerUp}
+                                            onPointerLeave={handlePointerUp}
+                                        >
                                             <ResponsiveCanvas 
                                                 onMount={(c) => { 
                                                     processedCanvasRef.current = c; 
@@ -885,7 +983,7 @@ export const SmartToolsWorkspace: React.FC = () => {
                             </div>
 
                             {/* Transport Bar */}
-                            <footer className="h-24 bg-slate-900/80 backdrop-blur-xl border-t border-slate-800 flex items-center justify-center gap-8 px-10">
+                            <footer className="h-20 md:h-24 bg-slate-900/90 backdrop-blur-xl border-t border-slate-800 flex items-center justify-center gap-4 md:gap-8 px-4 md:px-10 shrink-0 absolute bottom-0 md:relative w-full z-20">
                                 <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                                     <button 
                                         onClick={() => {
@@ -893,11 +991,11 @@ export const SmartToolsWorkspace: React.FC = () => {
                                             if (isPlaying && sourceBuffer) startPlayback(sourceBuffer, progress * sourceBuffer.duration);
                                         }}
                                         className={clsx(
-                                            "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                            "px-3 md:px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
                                             playbackMode === 'source' ? "bg-slate-800 text-white" : "text-slate-500 hover:text-slate-300"
                                         )}
                                     >
-                                        Source
+                                        Src
                                     </button>
                                     <button 
                                         onClick={() => {
@@ -905,29 +1003,44 @@ export const SmartToolsWorkspace: React.FC = () => {
                                             if (isPlaying && processedBuffer) startPlayback(processedBuffer, progress * processedBuffer.duration);
                                         }}
                                         className={clsx(
-                                            "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                            "px-3 md:px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
                                             playbackMode === 'processed' ? "bg-slate-800 text-white" : "text-slate-500 hover:text-slate-300"
                                         )}
                                     >
-                                        Processed
+                                        Mix
                                     </button>
                                 </div>
 
-                                <button 
-                                    onClick={togglePlay}
-                                    className="w-14 h-14 bg-blue-600 hover:bg-blue-500 rounded-full flex items-center justify-center shadow-xl shadow-blue-900/20 active:scale-90 transition-all"
-                                >
-                                    {isPlaying ? <Square size={24} fill="white" className="text-white" /> : <Play size={24} fill="white" className="text-white ml-1" />}
-                                </button>
+                                <div className="flex items-center gap-2">
+                                     <button 
+                                        onClick={() => {
+                                            setProgress(0);
+                                            if (isPlaying) {
+                                                const buffer = playbackMode === 'source' ? sourceBuffer : processedBuffer;
+                                                if(buffer) startPlayback(buffer, 0);
+                                            }
+                                        }}
+                                        className="w-10 h-10 md:w-12 md:h-12 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center text-slate-300 hover:text-white transition-all"
+                                    >
+                                        <SkipBack size={18} fill="currentColor" />
+                                    </button>
 
-                                <div className="text-2xl font-mono tabular-nums text-slate-400">
+                                    <button 
+                                        onClick={togglePlay}
+                                        className="w-12 h-12 md:w-14 md:h-14 bg-blue-600 hover:bg-blue-500 rounded-full flex items-center justify-center shadow-xl shadow-blue-900/20 active:scale-90 transition-all"
+                                    >
+                                        {isPlaying ? <Square size={20} fill="white" className="text-white" /> : <Play size={20} fill="white" className="text-white ml-1" />}
+                                    </button>
+                                </div>
+
+                                <div className="text-xs md:text-xl font-mono tabular-nums text-slate-400 hidden md:block">
                                     {(progress * (sourceBuffer?.duration || 0)).toFixed(2)}
                                     <span className="text-slate-700 mx-1">/</span>
                                     <span className="text-slate-600">{(sourceBuffer?.duration || 0).toFixed(2)}</span>
                                 </div>
                             </footer>
                         </>
-                    )}
+                    ))}
                 </section>
             </main>
         </div>

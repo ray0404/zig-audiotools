@@ -205,4 +205,27 @@ export class SonicForgeSDK {
     const { process_echovanish } = this.wasmInstance!.exports as any;
     return this.processBuffer(channelData, (ptr, len) => process_echovanish(ptr, len, sampleRate, amount, tailMs));
   }
+
+  analyzeAudio(interleavedData: Float32Array, channelCount: number, sampleRate: number): Float32Array {
+    if (!this.wasmInstance || !this.memory) throw new Error('SDK not initialized');
+    const { alloc, free, analyze_audio_comprehensive } = this.wasmInstance.exports as any;
+
+    const len = interleavedData.length;
+    const inputPtr = alloc(len);
+    const outLen = 14;
+    const outputPtr = alloc(outLen);
+
+    try {
+        const inputView = new Float32Array(this.memory.buffer, inputPtr, len);
+        inputView.set(interleavedData);
+
+        analyze_audio_comprehensive(inputPtr, len, channelCount, sampleRate, outputPtr);
+
+        const outputView = new Float32Array(this.memory.buffer, outputPtr, outLen);
+        return new Float32Array(outputView);
+    } finally {
+        free(inputPtr, len);
+        free(outputPtr, outLen);
+    }
+  }
 }
